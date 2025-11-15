@@ -338,6 +338,7 @@
 #cmakedefine SDL_THREAD_PSP 1
 #cmakedefine SDL_THREAD_PS2 1
 #cmakedefine SDL_THREAD_N3DS 1
+#cmakedefine SDL_THREAD_SWITCH 1
 
 /* Enable various RTC systems */
 #cmakedefine SDL_TIME_UNIX 1
@@ -346,6 +347,7 @@
 #cmakedefine SDL_TIME_PSP 1
 #cmakedefine SDL_TIME_PS2 1
 #cmakedefine SDL_TIME_N3DS 1
+#cmakedefine SDL_TIME_SWITCH 1
 
 /* Enable various timer systems */
 #cmakedefine SDL_TIMER_HAIKU 1
@@ -367,6 +369,7 @@
 #cmakedefine SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC @SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC@
 #cmakedefine SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC_GBM @SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC_GBM@
 #cmakedefine SDL_VIDEO_DRIVER_N3DS 1
+#cmakedefine SDL_VIDEO_DRIVER_SWITCH 1
 #cmakedefine SDL_VIDEO_DRIVER_OFFSCREEN 1
 #cmakedefine SDL_VIDEO_DRIVER_PS2 1
 #cmakedefine SDL_VIDEO_DRIVER_PSP 1
@@ -405,7 +408,6 @@
 #cmakedefine SDL_VIDEO_DRIVER_X11_XSHAPE 1
 #cmakedefine SDL_VIDEO_DRIVER_X11_XSYNC 1
 #cmakedefine SDL_VIDEO_DRIVER_QNX 1
-#cmakedefine SDL_VIDEO_DRIVER_SWITCH 1
 
 #cmakedefine SDL_VIDEO_RENDER_D3D 1
 #cmakedefine SDL_VIDEO_RENDER_D3D11 1
