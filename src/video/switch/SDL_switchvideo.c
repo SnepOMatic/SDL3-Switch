@@ -115,6 +115,8 @@ static SDL_VideoDevice *SWITCH_CreateDevice()
     device->HasScreenKeyboardSupport = SWITCH_HasScreenKeyboardSupport;
     device->IsScreenKeyboardShown = SWITCH_IsScreenKeyboardShown;
 
+    device->device_caps = VIDEO_DEVICE_CAPS_FULLSCREEN_ONLY;
+
     device->PumpEvents = SWITCH_PumpEvents;
 
     return device;
