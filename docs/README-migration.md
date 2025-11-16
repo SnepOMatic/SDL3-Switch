@@ -1280,6 +1280,7 @@ The following platform preprocessor macros have been renamed:
 | SDL2              | SDL3                      |
 |-------------------|---------------------------|
 | `__3DS__`         | `SDL_PLATFORM_3DS`        |
+| `__SWITCH__`      | `SDL_PLATFORM_SWITCH`     |
 | `__AIX__`         | `SDL_PLATFORM_AIX`        |
 | `__ANDROID__`     | `SDL_PLATFORM_ANDROID`    |
 | `__APPLE__`       | `SDL_PLATFORM_APPLE`      |

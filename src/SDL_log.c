@@ -767,6 +767,15 @@ static void SDLCALL SDL_LogOutput(void *userdata, int category, SDL_LogPriority 
             (void)fclose(pFile);
         }
     }
+#elif defined(SDL_PLATFORM_SWITCH)
+    {
+        FILE *pFile;
+        pFile = fopen("sdmc:/switch/SDL_Log.txt", "a");
+        if (pFile) {
+            (void)fprintf(pFile, "%s%s\n", GetLogPriorityPrefix(priority), message);
+            (void)fclose(pFile);
+        }
+    }
 #endif
 #if defined(HAVE_STDIO_H) && \
     !(defined(SDL_PLATFORM_APPLE) && (defined(SDL_VIDEO_DRIVER_COCOA) || defined(SDL_VIDEO_DRIVER_UIKIT))) && \

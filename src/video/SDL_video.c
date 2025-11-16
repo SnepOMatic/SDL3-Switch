@@ -69,6 +69,10 @@
 #include <3ds.h>
 #endif
 
+#ifdef SDL_PLATFORM_SWITCH
+#include <switch.h>
+#endif
+
 #ifdef SDL_PLATFORM_LINUX
 #include <sys/types.h>
 #include <sys/stat.h>

@@ -88,6 +88,9 @@
 #ifdef SDL_PLATFORM_3DS
 #include <3ds.h>
 #endif
+#ifdef SDL_PLATFORM_SWITCH
+#include <switch.h>
+#endif
 #ifdef SDL_PLATFORM_PS2
 #include <kernel.h>
 #endif
@@ -660,6 +663,13 @@ int SDL_GetNumLogicalCPUCores(void)
             SDL_NumLogicalCPUCores = isNew3DS ? 4 : 2;
         }
 #endif
+#ifdef SDL_PLATFORM_SWITCH
+        if (SDL_NumLogicalCPUCores <= 0) {
+            // 1 core is always dedicated to the OS
+            // Meaning that the are 3 available cores.
+            SDL_NumLogicalCPUCores = 4;
+        }      
+#endif
         // There has to be at least 1, right? :)
         if (SDL_NumLogicalCPUCores <= 0) {
             SDL_NumLogicalCPUCores = 1;
@@ -1177,6 +1187,13 @@ int SDL_GetSystemRAM(void)
         if (SDL_SystemRAM <= 0) {
             // The New3DS has 255MiB, the Old3DS 127MiB
             SDL_SystemRAM = (int)(osGetMemRegionSize(MEMREGION_ALL) / (1024 * 1024));
+        }
+#endif
+#ifdef SDL_PLATFORM_SWITCH
+        if (SDL_SystemRAM <= 0) {
+            // Retail has 4GB, custom or dev units have 8GB.
+            // Set as 4GB, but can vary depending if in applet mode or non-retail.
+            SDL_SystemRAM = 4096;
         }
 #endif
 #ifdef SDL_PLATFORM_VITA
