@@ -27,9 +27,6 @@
 
 #include <limits.h>
 #include <sys/unistd.h>
-#include <sys/stat.h>
-#include <errno.h>
-
 
 char *SDL_SYS_GetBasePath(void)
 {
