@@ -461,8 +461,6 @@ static void ALSA_CloseDevice(SDL_AudioDevice *device)
 {
     if (device->hidden) {
         if (device->hidden->pcm) {
-            // Wait for the submitted audio to drain. ALSA_snd_pcm_drop() can hang, so don't use that.
-            SDL_Delay(((device->sample_frames * 1000) / device->spec.freq) * 2);
             ALSA_snd_pcm_close(device->hidden->pcm);
         }
         SDL_free(device->hidden->mixbuf);
@@ -1156,7 +1154,7 @@ static bool ALSA_OpenDevice(SDL_AudioDevice *device)
     #if SDL_ALSA_DEBUG
     snd_pcm_uframes_t bufsize;
     ALSA_snd_pcm_hw_params_get_buffer_size(cfg_ctx.hwparams, &bufsize);
-    SDL_LogError(SDL_LOG_CATEGORY_AUDIO,
+    SDL_LogDebug(SDL_LOG_CATEGORY_AUDIO,
                      "ALSA: period size = %ld, periods = %u, buffer size = %lu",
                      cfg_ctx.persize, cfg_ctx.periods, bufsize);
     #endif

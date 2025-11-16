@@ -421,7 +421,7 @@ static int VULKAN_VkFormatGetNumPlanes(VkFormat vkFormat)
     }
 }
 
-static VkDeviceSize VULKAN_GetBytesPerPixel(VkFormat vkFormat)
+static VkDeviceSize VULKAN_GetBytesPerPixel(VkFormat vkFormat, int plane)
 {
     switch (vkFormat) {
     case VK_FORMAT_R8_UNORM:
@@ -436,6 +436,10 @@ static VkDeviceSize VULKAN_GetBytesPerPixel(VkFormat vkFormat)
         return 4;
     case VK_FORMAT_R16G16B16A16_SFLOAT:
         return 8;
+    case VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM:
+        return 1;
+    case VK_FORMAT_G8_B8R8_2PLANE_420_UNORM:
+        return (plane == 0) ? 1 : 2;
     default:
         return 4;
     }
@@ -903,7 +907,7 @@ static void VULKAN_RecordPipelineImageBarrier(VULKAN_RenderData *rendererData, V
 
 static VkResult VULKAN_AcquireNextSwapchainImage(SDL_Renderer *renderer)
 {
-    VULKAN_RenderData *rendererData = ( VULKAN_RenderData * )renderer->internal;
+    VULKAN_RenderData *rendererData = (VULKAN_RenderData *)renderer->internal;
 
     VkResult result;
 
@@ -911,10 +915,12 @@ static VkResult VULKAN_AcquireNextSwapchainImage(SDL_Renderer *renderer)
     result = vkAcquireNextImageKHR(rendererData->device, rendererData->swapchain, UINT64_MAX,
         rendererData->imageAvailableSemaphores[rendererData->currentCommandBufferIndex], VK_NULL_HANDLE, &rendererData->currentSwapchainImageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_ERROR_SURFACE_LOST_KHR) {
-        result = VULKAN_CreateWindowSizeDependentResources(renderer);
+        if (!(renderer->window->flags & SDL_WINDOW_MINIMIZED)) {
+            result = VULKAN_CreateWindowSizeDependentResources(renderer);
+        }
         return result;
     } else if(result == VK_SUBOPTIMAL_KHR) {
-        // Suboptimal, but we can contiue
+        // Suboptimal, but we can continue
     } else if (result != VK_SUCCESS) {
         SET_ERROR_CODE("vkAcquireNextImageKHR()", result);
         return result;
@@ -2499,7 +2505,7 @@ static VkResult VULKAN_CreateWindowSizeDependentResources(SDL_Renderer *renderer
 
     result = VULKAN_CreateSwapChain(renderer, w, h);
     if (result != VK_SUCCESS) {
-        rendererData->recreateSwapchain = VK_TRUE;
+        rendererData->recreateSwapchain = true;
     }
 
     rendererData->viewportDirty = true;
@@ -2549,6 +2555,13 @@ static void VULKAN_WindowEvent(SDL_Renderer *renderer, const SDL_WindowEvent *ev
     if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
         rendererData->recreateSwapchain = true;
     }
+
+#ifdef SDL_PLATFORM_ANDROID
+    // Prevent black screen when app returns from background
+    if (event->type == SDL_EVENT_WINDOW_RESTORED) {
+        VULKAN_HandleDeviceLost(renderer);
+    }
+#endif
 }
 
 static bool VULKAN_SupportsBlendMode(SDL_Renderer *renderer, SDL_BlendMode blendMode)
@@ -2738,7 +2751,7 @@ static bool VULKAN_CreateTexture(SDL_Renderer *renderer, SDL_Texture *texture, S
     }
 
     SDL_PropertiesID props = SDL_GetTextureProperties(texture);
-    SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_VULKAN_TEXTURE_NUMBER, (Sint64)textureData->mainImage.image);
+    SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_VULKAN_TEXTURE_NUMBER, (Sint64)textureData->mainImage.image);
 
     if (texture->access == SDL_TEXTUREACCESS_TARGET) {
         result = VULKAN_CreateFramebuffersAndRenderPasses(renderer,
@@ -2811,7 +2824,7 @@ static void VULKAN_DestroyTexture(SDL_Renderer *renderer,
 
 static bool VULKAN_UpdateTextureInternal(VULKAN_RenderData *rendererData, VkImage image, VkFormat format, int plane, int x, int y, int w, int h, const void *pixels, int pitch, VkImageLayout *imageLayout)
 {
-    VkDeviceSize pixelSize = VULKAN_GetBytesPerPixel(format);
+    VkDeviceSize pixelSize = VULKAN_GetBytesPerPixel(format, plane);
     VkDeviceSize length = w * pixelSize;
     VkDeviceSize uploadBufferSize = length * h;
     const Uint8 *src;
@@ -2964,11 +2977,20 @@ static bool VULKAN_UpdateTextureYUV(SDL_Renderer *renderer, SDL_Texture *texture
     if (!VULKAN_UpdateTextureInternal(rendererData, textureData->mainImage.image, textureData->mainImage.format, 0, rect->x, rect->y, rect->w, rect->h, Yplane, Ypitch, &textureData->mainImage.imageLayout)) {
         return false;
     }
-    if (!VULKAN_UpdateTextureInternal(rendererData, textureData->mainImage.image, textureData->mainImage.format, 1, rect->x / 2, rect->y / 2, rect->w / 2, rect->h / 2, Uplane, Upitch, &textureData->mainImage.imageLayout)) {
-        return false;
-    }
-    if (!VULKAN_UpdateTextureInternal(rendererData, textureData->mainImage.image, textureData->mainImage.format, 2, rect->x / 2, rect->y / 2, rect->w / 2, rect->h / 2, Vplane, Vpitch, &textureData->mainImage.imageLayout)) {
-        return false;
+    if (texture->format == SDL_PIXELFORMAT_YV12) {
+        if (!VULKAN_UpdateTextureInternal(rendererData, textureData->mainImage.image, textureData->mainImage.format, 1, rect->x / 2, rect->y / 2, (rect->w + 1) / 2, (rect->h + 1) / 2, Vplane, Vpitch, &textureData->mainImage.imageLayout)) {
+            return false;
+        }
+        if (!VULKAN_UpdateTextureInternal(rendererData, textureData->mainImage.image, textureData->mainImage.format, 2, rect->x / 2, rect->y / 2, (rect->w + 1) / 2, (rect->h + 1) / 2, Uplane, Upitch, &textureData->mainImage.imageLayout)) {
+            return false;
+        }
+    } else {
+        if (!VULKAN_UpdateTextureInternal(rendererData, textureData->mainImage.image, textureData->mainImage.format, 1, rect->x / 2, rect->y / 2, (rect->w + 1) / 2, (rect->h + 1) / 2, Uplane, Upitch, &textureData->mainImage.imageLayout)) {
+            return false;
+        }
+        if (!VULKAN_UpdateTextureInternal(rendererData, textureData->mainImage.image, textureData->mainImage.format, 2, rect->x / 2, rect->y / 2, (rect->w + 1) / 2, (rect->h + 1) / 2, Vplane, Vpitch, &textureData->mainImage.imageLayout)) {
+            return false;
+        }
     }
     return true;
 }
@@ -3010,7 +3032,7 @@ static bool VULKAN_LockTexture(SDL_Renderer *renderer, SDL_Texture *texture,
         return SDL_SetError("texture is already locked");
     }
 
-    VkDeviceSize pixelSize = VULKAN_GetBytesPerPixel(textureData->mainImage.format);
+    VkDeviceSize pixelSize = VULKAN_GetBytesPerPixel(textureData->mainImage.format, 0);
     VkDeviceSize length = rect->w * pixelSize;
     VkDeviceSize stagingBufferSize = length * rect->h;
     rc = VULKAN_AllocateBuffer(rendererData,
@@ -3763,7 +3785,7 @@ static bool VULKAN_SetCopyState(SDL_Renderer *renderer, const SDL_RenderCommand 
     VULKAN_SetupShaderConstants(renderer, cmd, texture, &constants);
 
     switch (cmd->data.draw.texture_scale_mode) {
-    case VK_FILTER_NEAREST:
+    case SDL_SCALEMODE_NEAREST:
         switch (cmd->data.draw.texture_address_mode) {
         case SDL_TEXTURE_ADDRESS_CLAMP:
             textureSampler = rendererData->samplers[VULKAN_SAMPLER_NEAREST_CLAMP];
@@ -3775,7 +3797,7 @@ static bool VULKAN_SetCopyState(SDL_Renderer *renderer, const SDL_RenderCommand 
             return SDL_SetError("Unknown texture address mode: %d", cmd->data.draw.texture_address_mode);
         }
         break;
-    case VK_FILTER_LINEAR:
+    case SDL_SCALEMODE_LINEAR:
         switch (cmd->data.draw.texture_address_mode) {
         case SDL_TEXTURE_ADDRESS_CLAMP:
             textureSampler = rendererData->samplers[VULKAN_SAMPLER_LINEAR_CLAMP];
@@ -3999,7 +4021,7 @@ static SDL_Surface* VULKAN_RenderReadPixels(SDL_Renderer *renderer, const SDL_Re
         vkFormat = rendererData->surfaceFormat.format;
     }
 
-    pixelSize = VULKAN_GetBytesPerPixel(vkFormat);
+    pixelSize = VULKAN_GetBytesPerPixel(vkFormat, 0);
     length = rect->w * pixelSize;
     readbackBufferSize = length * rect->h;
     if (VULKAN_AllocateBuffer(rendererData, readbackBufferSize,
