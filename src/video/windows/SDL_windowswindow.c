@@ -39,43 +39,9 @@
 // Dropfile support
 #include <shellapi.h>
 
-// Dark mode support
-typedef enum {
-    UXTHEME_APPMODE_DEFAULT,
-    UXTHEME_APPMODE_ALLOW_DARK,
-    UXTHEME_APPMODE_FORCE_DARK,
-    UXTHEME_APPMODE_FORCE_LIGHT,
-    UXTHEME_APPMODE_MAX
-} UxthemePreferredAppMode;
-
-typedef enum {
-    WCA_UNDEFINED = 0,
-    WCA_USEDARKMODECOLORS = 26,
-    WCA_LAST = 27
-} WINDOWCOMPOSITIONATTRIB;
-
-typedef struct {
-    WINDOWCOMPOSITIONATTRIB Attrib;
-    PVOID pvData;
-    SIZE_T cbData;
-} WINDOWCOMPOSITIONATTRIBDATA;
-
-typedef struct {
-    ULONG dwOSVersionInfoSize;
-    ULONG dwMajorVersion;
-    ULONG dwMinorVersion;
-    ULONG dwBuildNumber;
-    ULONG dwPlatformId;
-    WCHAR szCSDVersion[128];
-} NT_OSVERSIONINFOW;
-
-typedef bool (WINAPI *ShouldAppsUseDarkMode_t)(void);
-typedef void (WINAPI *AllowDarkModeForWindow_t)(HWND, bool);
-typedef void (WINAPI *AllowDarkModeForApp_t)(bool);
-typedef void (WINAPI *RefreshImmersiveColorPolicyState_t)(void);
-typedef UxthemePreferredAppMode (WINAPI *SetPreferredAppMode_t)(UxthemePreferredAppMode);
-typedef BOOL (WINAPI *SetWindowCompositionAttribute_t)(HWND, const WINDOWCOMPOSITIONATTRIBDATA *);
-typedef void (NTAPI *RtlGetVersion_t)(NT_OSVERSIONINFOW *);
+#if !(defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES))
+#include <shobjidl.h>
+#endif
 
 // Windows CE compatibility
 #ifndef SWP_NOCOPYBITS
@@ -174,6 +140,30 @@ static DWORD GetWindowStyleEx(SDL_Window *window)
     }
     return style;
 }
+
+#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+static ITaskbarList3 *GetTaskbarList(SDL_Window *window)
+{
+    const SDL_WindowData *data = window->internal;
+    SDL_assert(data->taskbar_button_created);
+    if (!data->videodata->taskbar_list) {
+        HRESULT ret = CoCreateInstance(&CLSID_TaskbarList, NULL, CLSCTX_ALL, &IID_ITaskbarList3, (LPVOID *)&data->videodata->taskbar_list);
+        if (FAILED(ret)) {
+            WIN_SetErrorFromHRESULT("Unable to create taskbar list", ret);
+            return NULL;
+        }
+        ITaskbarList3 *taskbarlist = data->videodata->taskbar_list;
+        ret = taskbarlist->lpVtbl->HrInit(taskbarlist);
+        if (FAILED(ret)) {
+            taskbarlist->lpVtbl->Release(taskbarlist);
+            data->videodata->taskbar_list = NULL;
+            WIN_SetErrorFromHRESULT("Unable to initialize taskbar list", ret);
+            return NULL;
+        }
+    }
+    return data->videodata->taskbar_list;
+}
+#endif
 
 /**
  * Returns arguments to pass to SetWindowPos - the window rect, including frame, in Windows coordinates.
@@ -401,7 +391,6 @@ static bool SetupWindowData(SDL_VideoDevice *_this, SDL_Window *window, HWND hwn
     data->last_pointer_update = (LPARAM)-1;
     data->videodata = videodata;
     data->initializing = true;
-    data->last_displayID = window->last_displayID;
     data->hint_erase_background_mode = GetEraseBackgroundModeHint();
 
 
@@ -438,16 +427,14 @@ static bool SetupWindowData(SDL_VideoDevice *_this, SDL_Window *window, HWND hwn
     // Set up the window proc function
 #ifdef GWLP_WNDPROC
     data->wndproc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_WNDPROC);
-    if (data->wndproc == WIN_WindowProc) {
+    if (data->wndproc == WIN_DefWindowProc) {
         data->wndproc = NULL;
-    } else {
         SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)WIN_WindowProc);
     }
 #else
     data->wndproc = (WNDPROC)GetWindowLong(hwnd, GWL_WNDPROC);
-    if (data->wndproc == WIN_WindowProc) {
+    if (data->wndproc == WIN_DefWindowProc) {
         data->wndproc = NULL;
-    } else {
         SetWindowLong(hwnd, GWL_WNDPROC, (LONG_PTR)WIN_WindowProc);
     }
 #endif
@@ -600,9 +587,7 @@ static void CleanupWindowData(SDL_VideoDevice *_this, SDL_Window *window)
         if (data->drop_target) {
             WIN_AcceptDragAndDrop(window, false);
         }
-        if (data->ICMFileName) {
-            SDL_free(data->ICMFileName);
-        }
+        SDL_free(data->ICMFileName);
         if (data->keyboard_hook) {
             UnhookWindowsHookEx(data->keyboard_hook);
         }
@@ -695,7 +680,7 @@ static void WIN_SetKeyboardFocus(SDL_Window *window, bool set_active_focus)
     toplevel->keyboard_focus = window;
 
     if (set_active_focus && !window->is_hiding && !window->is_destroying) {
-    	SDL_SetKeyboardFocus(window);
+        SDL_SetKeyboardFocus(window);
     }
 }
 
@@ -1209,7 +1194,7 @@ void WIN_SetWindowResizable(SDL_VideoDevice *_this, SDL_Window *window, bool res
 
 void WIN_SetWindowAlwaysOnTop(SDL_VideoDevice *_this, SDL_Window *window, bool on_top)
 {
-    WIN_SetWindowPositionInternal(window, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE, SDL_WINDOWRECT_CURRENT);
+    WIN_SetWindowPositionInternal(window, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER, SDL_WINDOWRECT_CURRENT);
 }
 
 void WIN_RestoreWindow(SDL_VideoDevice *_this, SDL_Window *window)
@@ -1402,9 +1387,7 @@ void WIN_UpdateWindowICCProfile(SDL_Window *window, bool send_event)
                 // fileNameSize includes '\0' on return
                 if (!data->ICMFileName ||
                     SDL_wcscmp(data->ICMFileName, fileName) != 0) {
-                    if (data->ICMFileName) {
-                        SDL_free(data->ICMFileName);
-                    }
+                    SDL_free(data->ICMFileName);
                     data->ICMFileName = SDL_wcsdup(fileName);
                     if (send_event) {
                         SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_ICCPROF_CHANGED, 0, 0);
@@ -1422,7 +1405,7 @@ void *WIN_GetWindowICCProfile(SDL_VideoDevice *_this, SDL_Window *window, size_t
     char *filename_utf8;
     void *iccProfileData = NULL;
 
-    filename_utf8 = WIN_StringToUTF8(data->ICMFileName);
+    filename_utf8 = WIN_StringToUTF8W(data->ICMFileName);
     if (filename_utf8) {
         iccProfileData = SDL_LoadFile(filename_utf8, size);
         if (!iccProfileData) {
@@ -1967,7 +1950,7 @@ static STDMETHODIMP SDLDropTarget_Drop(SDLDropTarget *target,
                              ". In Drop Text for   GlobalLock, format %08x '%s', memory (%lu) %p",
                              fetc.cfFormat, format_mime, (unsigned long)bsize, buffer);
                 if (buffer) {
-                    buffer = WIN_StringToUTF8((const wchar_t *)buffer);
+                    buffer = WIN_StringToUTF8W((const wchar_t *)buffer);
                     if (buffer) {
                         const size_t lbuffer = SDL_strlen((const char *)buffer);
                         SDL_LogTrace(SDL_LOG_CATEGORY_INPUT,
@@ -2114,8 +2097,8 @@ void WIN_AcceptDragAndDrop(SDL_Window *window, bool accept)
                 drop_target->lpVtbl = vtDropTarget;
                 drop_target->window = window;
                 drop_target->hwnd = data->hwnd;
-                drop_target->format_file = RegisterClipboardFormat(L"text/uri-list");
-                drop_target->format_text = RegisterClipboardFormat(L"text/plain;charset=utf-8");
+                drop_target->format_file = RegisterClipboardFormatW(L"text/uri-list");
+                drop_target->format_text = RegisterClipboardFormatW(L"text/plain;charset=utf-8");
                 data->drop_target = drop_target;
                 SDLDropTarget_AddRef(drop_target);
                 RegisterDragDrop(data->hwnd, (LPDROPTARGET)drop_target);
@@ -2163,6 +2146,59 @@ bool WIN_FlashWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_FlashOperat
 
     FlashWindowEx(&desc);
 
+    return true;
+}
+
+bool WIN_ApplyWindowProgress(SDL_VideoDevice *_this, SDL_Window *window)
+{
+#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+    SDL_WindowData *data = window->internal;
+    if (!data->taskbar_button_created) {
+        return true;
+    }
+
+    if (window->progress_state == SDL_PROGRESS_STATE_NONE && !data->videodata->taskbar_list) {
+        return true;
+    }
+
+    ITaskbarList3 *taskbar_list = GetTaskbarList(window);
+    if (!taskbar_list) {
+        return false;
+    }
+
+    TBPFLAG tbpFlags;
+    switch (window->progress_state) {
+    case SDL_PROGRESS_STATE_NONE:
+        tbpFlags = TBPF_NOPROGRESS;
+        break;
+    case SDL_PROGRESS_STATE_INDETERMINATE:
+        tbpFlags = TBPF_INDETERMINATE;
+        break;
+    case SDL_PROGRESS_STATE_NORMAL:
+        tbpFlags = TBPF_NORMAL;
+        break;
+    case SDL_PROGRESS_STATE_PAUSED:
+        tbpFlags = TBPF_PAUSED;
+        break;
+    case SDL_PROGRESS_STATE_ERROR:
+        tbpFlags = TBPF_ERROR;
+        break;
+    default:
+        return SDL_SetError("Parameter 'state' is not supported");
+    }
+
+    HRESULT ret = taskbar_list->lpVtbl->SetProgressState(taskbar_list, data->hwnd, tbpFlags);
+    if (FAILED(ret)) {
+        return WIN_SetErrorFromHRESULT("ITaskbarList3::SetProgressState()", ret);
+    }
+
+    if (window->progress_state >= SDL_PROGRESS_STATE_NORMAL) {
+        ret = taskbar_list->lpVtbl->SetProgressValue(taskbar_list, data->hwnd, (ULONGLONG)(window->progress_value * 10000.f), 10000);
+        if (FAILED(ret)) {
+            return WIN_SetErrorFromHRESULT("ITaskbarList3::SetProgressValue()", ret);
+        }
+    }
+#endif
     return true;
 }
 
@@ -2218,74 +2254,6 @@ bool WIN_SetWindowFocusable(SDL_VideoDevice *_this, SDL_Window *window, bool foc
     return true;
 }
 #endif // !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
-
-void WIN_UpdateDarkModeForHWND(HWND hwnd)
-{
-#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
-    HMODULE ntdll = LoadLibrary(TEXT("ntdll.dll"));
-    if (!ntdll) {
-        return;
-    }
-    // There is no function to get Windows build number, so let's get it here via RtlGetVersion
-    RtlGetVersion_t RtlGetVersionFunc = (RtlGetVersion_t)GetProcAddress(ntdll, "RtlGetVersion");
-    NT_OSVERSIONINFOW os_info;
-    os_info.dwOSVersionInfoSize = sizeof(NT_OSVERSIONINFOW);
-    os_info.dwBuildNumber = 0;
-    if (RtlGetVersionFunc) {
-        RtlGetVersionFunc(&os_info);
-    }
-    FreeLibrary(ntdll);
-    os_info.dwBuildNumber &= ~0xF0000000;
-    if (os_info.dwBuildNumber < 17763) {
-        // Too old to support dark mode
-        return;
-    }
-    HMODULE uxtheme = LoadLibrary(TEXT("uxtheme.dll"));
-    if (!uxtheme) {
-        return;
-    }
-    RefreshImmersiveColorPolicyState_t RefreshImmersiveColorPolicyStateFunc = (RefreshImmersiveColorPolicyState_t)GetProcAddress(uxtheme, MAKEINTRESOURCEA(104));
-    ShouldAppsUseDarkMode_t ShouldAppsUseDarkModeFunc = (ShouldAppsUseDarkMode_t)GetProcAddress(uxtheme, MAKEINTRESOURCEA(132));
-    AllowDarkModeForWindow_t AllowDarkModeForWindowFunc = (AllowDarkModeForWindow_t)GetProcAddress(uxtheme, MAKEINTRESOURCEA(133));
-    if (os_info.dwBuildNumber < 18362) {
-        AllowDarkModeForApp_t AllowDarkModeForAppFunc = (AllowDarkModeForApp_t)GetProcAddress(uxtheme, MAKEINTRESOURCEA(135));
-        if (AllowDarkModeForAppFunc) {
-            AllowDarkModeForAppFunc(true);
-        }
-    } else {
-        SetPreferredAppMode_t SetPreferredAppModeFunc = (SetPreferredAppMode_t)GetProcAddress(uxtheme, MAKEINTRESOURCEA(135));
-        if (SetPreferredAppModeFunc) {
-            SetPreferredAppModeFunc(UXTHEME_APPMODE_ALLOW_DARK);
-        }
-    }
-    if (RefreshImmersiveColorPolicyStateFunc) {
-        RefreshImmersiveColorPolicyStateFunc();
-    }
-    if (AllowDarkModeForWindowFunc) {
-        AllowDarkModeForWindowFunc(hwnd, true);
-    }
-    BOOL value;
-    // Check dark mode using ShouldAppsUseDarkMode, but use SDL_GetSystemTheme as a fallback
-    if (ShouldAppsUseDarkModeFunc) {
-        value = ShouldAppsUseDarkModeFunc() ? TRUE : FALSE;
-    } else {
-        value = (SDL_GetSystemTheme() == SDL_SYSTEM_THEME_DARK) ? TRUE : FALSE;
-    }
-    FreeLibrary(uxtheme);
-    if (os_info.dwBuildNumber < 18362) {
-        SetProp(hwnd, TEXT("UseImmersiveDarkModeColors"), SDL_reinterpret_cast(HANDLE, SDL_static_cast(INT_PTR, value)));
-    } else {
-        HMODULE user32 = GetModuleHandle(TEXT("user32.dll"));
-        if (user32) {
-            SetWindowCompositionAttribute_t SetWindowCompositionAttributeFunc = (SetWindowCompositionAttribute_t)GetProcAddress(user32, "SetWindowCompositionAttribute");
-            if (SetWindowCompositionAttributeFunc) {
-                WINDOWCOMPOSITIONATTRIBDATA data = { WCA_USEDARKMODECOLORS, &value, sizeof(value) };
-                SetWindowCompositionAttributeFunc(hwnd, &data);
-            }
-        }
-    }
-#endif
-}
 
 bool WIN_SetWindowParent(SDL_VideoDevice *_this, SDL_Window *window, SDL_Window *parent)
 {

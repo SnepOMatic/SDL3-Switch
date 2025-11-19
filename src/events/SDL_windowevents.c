@@ -56,7 +56,7 @@ void SDL_RemoveWindowEventWatch(SDL_WindowEventWatchPriority priority, SDL_Event
     SDL_RemoveEventWatchList(&SDL_window_event_watchers[priority], filter, userdata);
 }
 
-static bool SDLCALL RemoveSupercededWindowEvents(void *userdata, SDL_Event *event)
+static bool SDLCALL RemoveSupersededWindowEvents(void *userdata, SDL_Event *event)
 {
     SDL_Event *new_event = (SDL_Event *)userdata;
 
@@ -96,6 +96,12 @@ bool SDL_SendWindowEvent(SDL_Window *window, SDL_EventType windowevent, int data
     case SDL_EVENT_WINDOW_MOVED:
         window->undefined_x = false;
         window->undefined_y = false;
+        /* Clear the pending display if this move was not the result of an explicit request,
+         * and the window is not scheduled to become fullscreen when shown.
+         */
+        if (!window->last_position_pending && !(window->pending_flags & SDL_WINDOW_FULLSCREEN)) {
+            window->pending_displayID = 0;
+        }
         window->last_position_pending = false;
         if (!(window->flags & SDL_WINDOW_FULLSCREEN)) {
             window->windowed.x = data1;
@@ -182,10 +188,11 @@ bool SDL_SendWindowEvent(SDL_Window *window, SDL_EventType windowevent, int data
         window->flags &= ~SDL_WINDOW_INPUT_FOCUS;
         break;
     case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
-        if (data1 == 0 || (SDL_DisplayID)data1 == window->last_displayID) {
+        if (data1 == 0 || (SDL_DisplayID)data1 == window->displayID) {
             return false;
         }
-        window->last_displayID = (SDL_DisplayID)data1;
+        window->update_fullscreen_on_display_changed = true;
+        window->displayID = (SDL_DisplayID)data1;
         break;
     case SDL_EVENT_WINDOW_OCCLUDED:
         if (window->flags & SDL_WINDOW_OCCLUDED) {
@@ -232,7 +239,7 @@ bool SDL_SendWindowEvent(SDL_Window *window, SDL_EventType windowevent, int data
             windowevent == SDL_EVENT_WINDOW_SAFE_AREA_CHANGED ||
             windowevent == SDL_EVENT_WINDOW_EXPOSED ||
             windowevent == SDL_EVENT_WINDOW_OCCLUDED) {
-            SDL_FilterEvents(RemoveSupercededWindowEvents, &event);
+            SDL_FilterEvents(RemoveSupersededWindowEvents, &event);
         }
         posted = SDL_PushEvent(&event);
     }

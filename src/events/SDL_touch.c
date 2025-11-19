@@ -83,9 +83,11 @@ SDL_Touch *SDL_GetTouch(SDL_TouchID id)
 {
     int index = SDL_GetTouchIndex(id);
     if (index < 0 || index >= SDL_num_touch) {
-        if (SDL_GetVideoDevice()->ResetTouch != NULL) {
+        if ((id == SDL_MOUSE_TOUCHID) || (id == SDL_PEN_TOUCHID)) {
+            // this is a virtual touch device, but for some reason they aren't added to the system. Just ignore it.
+        } else if ( SDL_GetVideoDevice()->ResetTouch) {
             SDL_SetError("Unknown touch id %d, resetting", (int)id);
-            (SDL_GetVideoDevice()->ResetTouch)(SDL_GetVideoDevice());
+            SDL_GetVideoDevice()->ResetTouch(SDL_GetVideoDevice());
         } else {
             SDL_SetError("Unknown touch device id %d, cannot reset", (int)id);
         }
@@ -413,7 +415,7 @@ void SDL_SendTouchMotion(Uint64 timestamp, SDL_TouchID id, SDL_FingerID fingerid
     }
 
     // SDL_HINT_MOUSE_TOUCH_EVENTS: if not set, discard synthetic touch events coming from platform layer
-    if (mouse->mouse_touch_events == 0) {
+    if (!mouse->mouse_touch_events) {
         if (id == SDL_MOUSE_TOUCHID) {
             return;
         }
@@ -498,3 +500,19 @@ void SDL_QuitTouch(void)
     SDL_free(SDL_touchDevices);
     SDL_touchDevices = NULL;
 }
+
+int SDL_SendPinch(SDL_EventType type, Uint64 timestamp, SDL_Window *window, float scale)
+{
+    /* Post the event, if desired */
+    int posted = 0;
+    if (SDL_EventEnabled(type)) {
+        SDL_Event event;
+        event.type = type;
+        event.common.timestamp = timestamp;
+        event.pinch.scale = scale;
+        event.pinch.windowID = window ? SDL_GetWindowID(window) : 0;
+        posted = (SDL_PushEvent(&event) > 0);
+    }
+    return posted;
+}
+

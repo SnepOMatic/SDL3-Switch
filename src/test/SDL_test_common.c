@@ -63,6 +63,7 @@ static const char *video_usage[] = {
     "[--minimize]",
     "[--mouse-focus]",
     "[--noframe]",
+    "[--quit-after-ms N]",
     "[--refresh R]",
     "[--renderer driver]",
     "[--resizable]",
@@ -85,6 +86,16 @@ static const char *audio_usage[] = {
     "[--channels N]",
     NULL
 };
+
+// tests can quit after N ms
+static Uint32 SDLCALL quit_after_ms_cb(void *userdata, SDL_TimerID timerID, Uint32 interval)
+{
+    SDL_Event event;
+    event.type = SDL_EVENT_QUIT;
+    event.common.timestamp = 0;
+    SDL_PushEvent(&event);
+    return 0;
+}
 
 static void SDL_snprintfcat(SDL_OUT_Z_CAP(maxlen) char *text, size_t maxlen, SDL_PRINTF_FORMAT_STRING const char *fmt, ...)
 {
@@ -508,6 +519,17 @@ static int SDLCALL SDLTest_CommonStateParseVideoArguments(void *data, char **arg
     if (SDL_strcasecmp(argv[index], "--noframe") == 0) {
         state->window_flags |= SDL_WINDOW_BORDERLESS;
         return 1;
+    }
+    if (SDL_strcasecmp(argv[index], "--quit-after-ms") == 0) {
+        ++index;
+        if (!argv[index]) {
+            return -1;
+        }
+        state->quit_after_ms_interval = SDL_atoi(argv[index]);
+        if (state->quit_after_ms_interval <= 0) {
+            return -1;
+        }
+        return 2;
     }
     if (SDL_strcasecmp(argv[index], "--resizable") == 0) {
         state->window_flags |= SDL_WINDOW_RESIZABLE;
@@ -1523,8 +1545,11 @@ bool SDLTest_CommonInit(SDLTest_CommonState *state)
         }
     }
 
-    if (state->flags & SDL_INIT_CAMERA) {
-        SDL_InitSubSystem(SDL_INIT_CAMERA);
+    SDL_InitSubSystem(state->flags);
+
+
+    if (state->quit_after_ms_interval) {
+        state->quit_after_ms_timer = SDL_AddTimer(state->quit_after_ms_interval, quit_after_ms_cb, NULL);
     }
 
     return true;
@@ -1624,6 +1649,14 @@ void SDLTest_PrintEvent(const SDL_Event *event)
             float scale = SDL_GetDisplayContentScale(event->display.displayID);
             SDL_Log("SDL EVENT: Display %" SDL_PRIu32 " changed content scale to %d%%",
                     event->display.displayID, (int)(scale * 100.0f));
+        }
+        break;
+    case SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED:
+        {
+            SDL_Rect bounds;
+            SDL_GetDisplayUsableBounds(event->display.displayID, &bounds);
+            SDL_Log("SDL EVENT: Display %" SDL_PRIu32 " changed usable bounds to %dx%d at %d,%d",
+                    event->display.displayID, bounds.w, bounds.h, bounds.x, bounds.y);
         }
         break;
     case SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED:
@@ -1733,12 +1766,12 @@ void SDLTest_PrintEvent(const SDL_Event *event)
         SDL_Log("SDL EVENT: Window %" SDL_PRIu32 " HDR %s", event->window.windowID, event->window.data1 ? "enabled" : "disabled");
         break;
     case SDL_EVENT_KEYBOARD_ADDED:
-        SDL_Log("SDL EVENT: Keyboard %" SDL_PRIu32 " attached",
-                event->kdevice.which);
+        SDL_Log("SDL EVENT: Keyboard %" SDL_PRIu32 " (%s) attached",
+                event->kdevice.which, SDL_GetKeyboardNameForID(event->kdevice.which));
         break;
     case SDL_EVENT_KEYBOARD_REMOVED:
-        SDL_Log("SDL EVENT: Keyboard %" SDL_PRIu32 " removed",
-                event->kdevice.which);
+        SDL_Log("SDL EVENT: Keyboard %" SDL_PRIu32 " (%s) removed",
+                event->kdevice.which, SDL_GetKeyboardNameForID(event->kdevice.which));
         break;
     case SDL_EVENT_KEY_DOWN:
     case SDL_EVENT_KEY_UP: {
@@ -1775,12 +1808,12 @@ void SDLTest_PrintEvent(const SDL_Event *event)
         SDL_Log("SDL EVENT: Keymap changed");
         break;
     case SDL_EVENT_MOUSE_ADDED:
-        SDL_Log("SDL EVENT: Mouse %" SDL_PRIu32 " attached",
-                event->mdevice.which);
+        SDL_Log("SDL EVENT: Mouse %" SDL_PRIu32 " (%s) attached",
+                event->mdevice.which, SDL_GetMouseNameForID(event->mdevice.which));
         break;
     case SDL_EVENT_MOUSE_REMOVED:
-        SDL_Log("SDL EVENT: Mouse %" SDL_PRIu32 " removed",
-                event->mdevice.which);
+        SDL_Log("SDL EVENT: Mouse %" SDL_PRIu32 " (%s) removed",
+                event->mdevice.which, SDL_GetMouseNameForID(event->mdevice.which));
         break;
     case SDL_EVENT_MOUSE_MOTION:
         SDL_Log("SDL EVENT: Mouse: moved to %g,%g (%g,%g) in window %" SDL_PRIu32,
@@ -1803,12 +1836,12 @@ void SDLTest_PrintEvent(const SDL_Event *event)
                 event->wheel.x, event->wheel.y, event->wheel.direction, event->wheel.windowID);
         break;
     case SDL_EVENT_JOYSTICK_ADDED:
-        SDL_Log("SDL EVENT: Joystick %" SDL_PRIu32 " attached",
-                event->jdevice.which);
+        SDL_Log("SDL EVENT: Joystick %" SDL_PRIu32 " (%s) attached",
+                event->jdevice.which, SDL_GetJoystickNameForID(event->jdevice.which));
         break;
     case SDL_EVENT_JOYSTICK_REMOVED:
-        SDL_Log("SDL EVENT: Joystick %" SDL_PRIu32 " removed",
-                event->jdevice.which);
+        SDL_Log("SDL EVENT: Joystick %" SDL_PRIu32 " (%s) removed",
+                event->jdevice.which, SDL_GetJoystickNameForID(event->jdevice.which));
         break;
     case SDL_EVENT_JOYSTICK_AXIS_MOTION:
         SDL_Log("SDL EVENT: Joystick %" SDL_PRIu32 " axis %d value: %d",
@@ -1869,12 +1902,12 @@ void SDLTest_PrintEvent(const SDL_Event *event)
                 event->jbattery.which, event->jbattery.percent);
         break;
     case SDL_EVENT_GAMEPAD_ADDED:
-        SDL_Log("SDL EVENT: Gamepad %" SDL_PRIu32 " attached",
-                event->gdevice.which);
+        SDL_Log("SDL EVENT: Gamepad %" SDL_PRIu32 " (%s) attached",
+                event->gdevice.which, SDL_GetGamepadNameForID(event->gdevice.which));
         break;
     case SDL_EVENT_GAMEPAD_REMOVED:
-        SDL_Log("SDL EVENT: Gamepad %" SDL_PRIu32 " removed",
-                event->gdevice.which);
+        SDL_Log("SDL EVENT: Gamepad %" SDL_PRIu32 " (%s) removed",
+                event->gdevice.which, SDL_GetGamepadNameForID(event->gdevice.which));
         break;
     case SDL_EVENT_GAMEPAD_REMAPPED:
         SDL_Log("SDL EVENT: Gamepad %" SDL_PRIu32 " mapping changed",
@@ -1918,6 +1951,16 @@ void SDLTest_PrintEvent(const SDL_Event *event)
                 event->tfinger.fingerID,
                 event->tfinger.x, event->tfinger.y,
                 event->tfinger.dx, event->tfinger.dy, event->tfinger.pressure);
+        break;
+
+    case SDL_EVENT_PINCH_BEGIN:
+        SDL_Log("SDL EVENT: Pinch Begin");
+        break;
+    case SDL_EVENT_PINCH_UPDATE:
+        SDL_Log("SDL EVENT: Pinch Update, scale=%f", event->pinch.scale);
+        break;
+    case SDL_EVENT_PINCH_END:
+        SDL_Log("SDL EVENT: Pinch End");
         break;
 
     case SDL_EVENT_RENDER_TARGETS_RESET:
@@ -2059,9 +2102,7 @@ static void SDLCALL SDLTest_ScreenShotClipboardCleanup(void *context)
 
     SDL_Log("Cleaning up screenshot image data");
 
-    if (data->image) {
-        SDL_free(data->image);
-    }
+    SDL_free(data->image);
     SDL_free(data);
 }
 
@@ -2230,6 +2271,7 @@ SDL_AppResult SDLTest_CommonEventMainCallbacks(SDLTest_CommonState *state, const
              event->type != SDL_EVENT_FINGER_MOTION &&
              event->type != SDL_EVENT_PEN_MOTION &&
              event->type != SDL_EVENT_PEN_AXIS &&
+             event->type != SDL_EVENT_PINCH_UPDATE &&
              event->type != SDL_EVENT_JOYSTICK_AXIS_MOTION) ||
             (state->verbose & VERBOSE_MOTION)) {
             SDLTest_PrintEvent(event);
@@ -2455,6 +2497,57 @@ SDL_AppResult SDLTest_CommonEventMainCallbacks(SDLTest_CommonState *state, const
                 }
             }
             break;
+        case SDLK_P:
+            if (withAlt) {
+                /* Alt-P cycle through progress states */
+                SDL_Window *window = SDL_GetWindowFromEvent(event);
+                if (window) {
+                    const char *name;
+                    SDL_ProgressState progress_state = SDL_GetWindowProgressState(window);
+                    progress_state += 1;
+                    if (progress_state > SDL_PROGRESS_STATE_ERROR) {
+                        progress_state = SDL_PROGRESS_STATE_NONE;
+                    }
+                    switch (progress_state) {
+                    case SDL_PROGRESS_STATE_NONE:
+                        name = "NONE";
+                        break;
+                    case SDL_PROGRESS_STATE_INDETERMINATE:
+                        name = "INDETERMINATE";
+                        break;
+                    case SDL_PROGRESS_STATE_NORMAL:
+                        name = "NORMAL";
+                        break;
+                    case SDL_PROGRESS_STATE_PAUSED:
+                        name = "PAUSED";
+                        break;
+                    case SDL_PROGRESS_STATE_ERROR:
+                        name = "ERROR";
+                        break;
+                    default:
+                        name = "UNKNOWN";
+                        break;
+                    }
+                    SDL_Log("Setting progress state to %s", name);
+                    SDL_SetWindowProgressState(window, progress_state);
+                }
+            }
+            else if (withControl)
+            {
+                /* Ctrl-P increase progress value */
+                SDL_Window *window = SDL_GetWindowFromEvent(event);
+                if (window) {
+                    float progress_value = SDL_GetWindowProgressValue(window);
+                    if (withShift) {
+                        progress_value -= 0.1f;
+                    } else {
+                        progress_value += 0.1f;
+                    }
+                    SDL_Log("Setting progress value to %.1f", progress_value);
+                    SDL_SetWindowProgressValue(window, progress_value);
+                }
+            }
+            break;
         case SDLK_G:
             if (withControl) {
                 /* Ctrl-G toggle mouse grab */
@@ -2658,6 +2751,10 @@ void SDLTest_CommonQuit(SDLTest_CommonState *state)
                 SDL_DestroyWindow(state->windows[i]);
             }
             SDL_free(state->windows);
+        }
+
+        if (state->quit_after_ms_timer) {
+            SDL_RemoveTimer(state->quit_after_ms_timer);
         }
     }
     SDL_Quit();

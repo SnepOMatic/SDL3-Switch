@@ -453,8 +453,8 @@ STBIDEF int stbi_convert_wchar_to_utf8(char *buffer, size_t bufferlen, const wch
 
 #if 0 /* not used in SDL */
 STBIDEF stbi_uc *stbi_load_from_memory_with_palette   (stbi_uc           const *buffer, int len , int *x, int *y, unsigned int *palette_buffer, int palette_buffer_len);
-STBIDEF stbi_uc *stbi_load_from_callbacks_with_palette(stbi_io_callbacks const *clbk, void *user, int *x, int *y, unsigned int *palette_buffer, int palette_buffer_len);
 #endif
+STBIDEF stbi_uc *stbi_load_from_callbacks_with_palette(stbi_io_callbacks const *clbk, void *user, int *x, int *y, unsigned int *palette_buffer, int palette_buffer_len);
 
 ////////////////////////////////////
 //
@@ -559,13 +559,17 @@ STBIDEF void stbi_set_flip_vertically_on_load_thread(int flag_true_if_should_fli
 // ZLIB client - used by PNG, available for other purposes
 
 #ifndef STBI_NO_ZLIB
+#if 0 /* not used in SDL */
 STBIDEF char *stbi_zlib_decode_malloc_guesssize(const char *buffer, int len, int initial_size, int *outlen);
+#endif
 STBIDEF char *stbi_zlib_decode_malloc_guesssize_headerflag(const char *buffer, int len, int initial_size, int *outlen, int parse_header);
+#if 0 /* not used in SDL */
 STBIDEF char *stbi_zlib_decode_malloc(const char *buffer, int len, int *outlen);
 STBIDEF int   stbi_zlib_decode_buffer(char *obuffer, int olen, const char *ibuffer, int ilen);
 
 STBIDEF char *stbi_zlib_decode_noheader_malloc(const char *buffer, int len, int *outlen);
 STBIDEF int   stbi_zlib_decode_noheader_buffer(char *obuffer, int olen, const char *ibuffer, int ilen);
+#endif
 #endif
 
 
@@ -897,7 +901,6 @@ static void stbi__start_mem(stbi__context *s, stbi_uc const *buffer, int len)
    s->img_buffer_end = s->img_buffer_original_end = (stbi_uc *) buffer+len;
 }
 
-#if 0 /* not used in SDL */
 // initialize a callback-based context
 static void stbi__start_callbacks(stbi__context *s, stbi_io_callbacks *c, void *user)
 {
@@ -910,7 +913,6 @@ static void stbi__start_callbacks(stbi__context *s, stbi_io_callbacks *c, void *
    stbi__refill_buffer(s);
    s->img_buffer_original_end = s->img_buffer_end;
 }
-#endif
 
 #ifndef STBI_NO_STDIO
 
@@ -1353,7 +1355,6 @@ static void stbi__vertical_flip_slices(void *image, int w, int h, int z, int byt
 }
 #endif
 
-#if 0 /* not used in SDL */
 static unsigned char *stbi__load_indexed(stbi__context *s, int *x, int *y, unsigned int *palette_buffer, int palette_buffer_len)
 {
    stbi__result_info ri;
@@ -1386,7 +1387,6 @@ static unsigned char *stbi__load_indexed(stbi__context *s, int *x, int *y, unsig
 
    return (unsigned char *) result;
 }
-#endif /**/
 
 static unsigned char *stbi__load_and_postprocess_8bit(stbi__context *s, int *x, int *y, int *comp, int req_comp)
 {
@@ -1568,7 +1568,6 @@ STBIDEF stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, i
    return stbi__load_and_postprocess_8bit(&s,x,y,comp,req_comp);
 }
 
-#if 0 /* not used in SDL */
 STBIDEF stbi_uc *stbi_load_from_callbacks(stbi_io_callbacks const *clbk, void *user, int *x, int *y, int *comp, int req_comp)
 {
    stbi__context s;
@@ -1576,12 +1575,14 @@ STBIDEF stbi_uc *stbi_load_from_callbacks(stbi_io_callbacks const *clbk, void *u
    return stbi__load_and_postprocess_8bit(&s,x,y,comp,req_comp);
 }
 
+#if 0 /* not used in SDL */
 STBIDEF stbi_uc *stbi_load_from_memory_with_palette(stbi_uc const *buffer, int len, int *x, int *y, unsigned int *palette_buffer, int palette_buffer_len)
 {
     stbi__context s;
     stbi__start_mem(&s, buffer, len);
     return stbi__load_indexed(&s, x, y, palette_buffer, palette_buffer_len);
 }
+#endif
 
 STBIDEF stbi_uc *stbi_load_from_callbacks_with_palette(stbi_io_callbacks const *clbk, void *user, int *x, int *y, unsigned int *palette_buffer, int palette_buffer_len)
 {
@@ -1589,7 +1590,6 @@ STBIDEF stbi_uc *stbi_load_from_callbacks_with_palette(stbi_io_callbacks const *
     stbi__start_callbacks(&s, (stbi_io_callbacks *)clbk, user);
     return stbi__load_indexed(&s, x, y, palette_buffer, palette_buffer_len);
 }
-#endif
 
 #ifndef STBI_NO_GIF
 STBIDEF stbi_uc *stbi_load_gif_from_memory(stbi_uc const *buffer, int len, int **delays, int *x, int *y, int *z, int *comp, int req_comp)
@@ -3408,8 +3408,8 @@ static int stbi__free_jpeg_components(stbi__jpeg *z, int ncomp, int why)
       }
       if (z->img_comp[i].raw_coeff) {
          STBI_FREE(z->img_comp[i].raw_coeff);
-         z->img_comp[i].raw_coeff = 0;
-         z->img_comp[i].coeff = 0;
+         z->img_comp[i].raw_coeff = NULL;
+         z->img_comp[i].coeff = NULL;
       }
       if (z->img_comp[i].linebuf) {
          STBI_FREE(z->img_comp[i].linebuf);
@@ -3489,8 +3489,8 @@ static int stbi__process_frame_header(stbi__jpeg *z, int scan)
       // so these muls can't overflow with 32-bit ints (which we require)
       z->img_comp[i].w2 = z->img_mcu_x * z->img_comp[i].h * 8;
       z->img_comp[i].h2 = z->img_mcu_y * z->img_comp[i].v * 8;
-      z->img_comp[i].coeff = 0;
-      z->img_comp[i].raw_coeff = 0;
+      z->img_comp[i].coeff = NULL;
+      z->img_comp[i].raw_coeff = NULL;
       z->img_comp[i].linebuf = NULL;
       z->img_comp[i].raw_data = stbi__malloc_mad2(z->img_comp[i].w2, z->img_comp[i].h2, 15);
       if (z->img_comp[i].raw_data == NULL)
@@ -4735,6 +4735,7 @@ static int stbi__do_zlib(stbi__zbuf *a, char *obuf, int olen, int exp, int parse
    return stbi__parse_zlib(a, parse_header);
 }
 
+#if 0 /* not used in SDL */
 STBIDEF char *stbi_zlib_decode_malloc_guesssize(const char *buffer, int len, int initial_size, int *outlen)
 {
    stbi__zbuf a;
@@ -4755,6 +4756,7 @@ STBIDEF char *stbi_zlib_decode_malloc(char const *buffer, int len, int *outlen)
 {
    return stbi_zlib_decode_malloc_guesssize(buffer, len, 16384, outlen);
 }
+#endif /* */
 
 STBIDEF char *stbi_zlib_decode_malloc_guesssize_headerflag(const char *buffer, int len, int initial_size, int *outlen, int parse_header)
 {
@@ -4772,6 +4774,7 @@ STBIDEF char *stbi_zlib_decode_malloc_guesssize_headerflag(const char *buffer, i
    }
 }
 
+#if 0 /* not used in SDL */
 STBIDEF int stbi_zlib_decode_buffer(char *obuffer, int olen, char const *ibuffer, int ilen)
 {
    stbi__zbuf a;
@@ -4809,6 +4812,7 @@ STBIDEF int stbi_zlib_decode_noheader_buffer(char *obuffer, int olen, const char
    else
       return -1;
 }
+#endif /* */
 #endif
 
 // public domain "baseline" PNG decoder   v0.10  Sean Barrett 2006-11-18
@@ -6544,26 +6548,26 @@ static void *stbi__psd_load(stbi__context *s, int *x, int *y, int *comp, int req
    if (channelCount >= 4) {
       if (ri->bits_per_channel == 16) {
          for (i=0; i < w*h; ++i) {
-            stbi__uint16 *pixel = (stbi__uint16 *) out + 4*i;
-            if (pixel[3] != 0 && pixel[3] != 65535) {
-               float a = pixel[3] / 65535.0f;
+            stbi__uint16 *pixels = (stbi__uint16 *) out + 4*i;
+            if (pixels[3] != 0 && pixels[3] != 65535) {
+               float a = pixels[3] / 65535.0f;
                float ra = 1.0f / a;
                float inv_a = 65535.0f * (1 - ra);
-               pixel[0] = (stbi__uint16) (pixel[0]*ra + inv_a);
-               pixel[1] = (stbi__uint16) (pixel[1]*ra + inv_a);
-               pixel[2] = (stbi__uint16) (pixel[2]*ra + inv_a);
+               pixels[0] = (stbi__uint16) (pixels[0]*ra + inv_a);
+               pixels[1] = (stbi__uint16) (pixels[1]*ra + inv_a);
+               pixels[2] = (stbi__uint16) (pixels[2]*ra + inv_a);
             }
          }
       } else {
          for (i=0; i < w*h; ++i) {
-            unsigned char *pixel = out + 4*i;
-            if (pixel[3] != 0 && pixel[3] != 255) {
-               float a = pixel[3] / 255.0f;
+            unsigned char *pixels = out + 4*i;
+            if (pixels[3] != 0 && pixels[3] != 255) {
+               float a = pixels[3] / 255.0f;
                float ra = 1.0f / a;
                float inv_a = 255.0f * (1 - ra);
-               pixel[0] = (unsigned char) (pixel[0]*ra + inv_a);
-               pixel[1] = (unsigned char) (pixel[1]*ra + inv_a);
-               pixel[2] = (unsigned char) (pixel[2]*ra + inv_a);
+               pixels[0] = (unsigned char) (pixels[0]*ra + inv_a);
+               pixels[1] = (unsigned char) (pixels[1]*ra + inv_a);
+               pixels[2] = (unsigned char) (pixels[2]*ra + inv_a);
             }
          }
       }

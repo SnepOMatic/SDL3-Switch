@@ -202,9 +202,9 @@ static X11_PenHandle *X11_MaybeAddPen(SDL_VideoDevice *_this, const XIDeviceInfo
 
     if ((dev->use != XISlavePointer && (dev->use != XIFloatingSlave)) || dev->enabled == 0 || !X11_XInput2DeviceIsPen(_this, dev)) {
         return NULL;  // Only track physical devices that are enabled and look like pens
-    } else if ((handle = X11_FindPenByDeviceID(dev->deviceid)) != 0) {
+    } else if ((handle = X11_FindPenByDeviceID(dev->deviceid)) != NULL) {
         return handle;  // already have this pen, skip it.
-    } else if ((handle = SDL_calloc(1, sizeof (*handle))) == NULL) {
+    } else if ((handle = SDL_calloc(1, sizeof(*handle))) == NULL) {
         return NULL;  // oh well.
     }
 
@@ -272,7 +272,7 @@ static X11_PenHandle *X11_MaybeAddPen(SDL_VideoDevice *_this, const XIDeviceInfo
     handle->is_eraser = is_eraser;
     handle->x11_deviceid = dev->deviceid;
 
-    handle->pen = SDL_AddPenDevice(0, dev->name, &peninfo, handle);
+    handle->pen = SDL_AddPenDevice(0, dev->name, NULL, &peninfo, handle);
     if (!handle->pen) {
         SDL_free(handle);
         return NULL;
@@ -301,7 +301,7 @@ void X11_RemovePenByDeviceID(int deviceid)
 {
     X11_PenHandle *handle = X11_FindPenByDeviceID(deviceid);
     if (handle) {
-        SDL_RemovePenDevice(0, handle->pen);
+        SDL_RemovePenDevice(0, NULL, handle->pen);
         SDL_free(handle);
     }
 }
