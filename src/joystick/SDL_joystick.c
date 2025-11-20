@@ -635,13 +635,6 @@ static SDL_vidpid_list zero_centered_devices = {
         return result;                                                  \
     }
 
-#define CHECK_JOYSTICK_VIRTUAL(joystick, result)                \
-    if (!joystick->is_virtual) {                                \
-        SDL_SetError("joystick isn't virtual");                 \
-        SDL_UnlockJoysticks();                                  \
-        return result;                                          \
-    }
-
 bool SDL_JoysticksInitialized(void)
 {
     return SDL_joysticks_initialized;

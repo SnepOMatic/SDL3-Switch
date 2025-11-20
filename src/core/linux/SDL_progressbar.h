@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2018 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -19,17 +19,12 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
-#ifndef _SDL_switchmouse_h
-#define _SDL_switchmouse_h
+#ifndef SDL_prograssbar_h_
+#define SDL_prograssbar_h_
 
+#include "../../video/SDL_sysvideo.h"
 #include "SDL_internal.h"
 
-/* mouse functions */
-extern void SWITCH_InitMouse(void);
-extern void SWITCH_PollMouse(Uint64 timestamp);
-extern void SWITCH_QuitMouse(void);
+extern bool DBUS_ApplyWindowProgress(SDL_VideoDevice *_this, SDL_Window *window);
 
-#endif /* _SDL_switchmouse_h */
-
-/* vi: set ts=4 sw=4 expandtab: */
-
+#endif // SDL_prograssbar_h_

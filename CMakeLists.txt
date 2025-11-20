@@ -3303,7 +3303,10 @@ elseif(N3DS)
   sdl_glob_sources("${SDL3_SOURCE_DIR}/src/locale/n3ds/*.c")
   set(HAVE_SDL_LOCALE TRUE)
 
-  sdl_glob_sources("${SDL3_SOURCE_DIR}/src/io/n3ds/*.c")
+  sdl_glob_sources(
+    "${SDL3_SOURCE_DIR}/src/io/n3ds/*.c"
+    "${SDL3_SOURCE_DIR}/src/io/n3ds/*.h"
+  )
   
 elseif(NINTENDO_SWITCH)
   sdl_link_dependency(nx LIBS nx)
