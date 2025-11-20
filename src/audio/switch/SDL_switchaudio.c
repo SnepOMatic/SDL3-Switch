@@ -139,7 +139,7 @@ static bool SWITCHAUDIO_PlayDevice(SDL_AudioDevice *device, const Uint8 *buffer,
 
     if (current >= 0) {
         Uint8 *ptr = (Uint8 *)(device->hidden->pool + (current * device->buffer_size));
-        memcpy(ptr, device->hidden->buffer_tmp, device->buffer_size);
+        SDL_memcpy(ptr, device->hidden->buffer_tmp, device->buffer_size);
         armDCacheFlush(ptr, device->buffer_size);
         audrvVoiceAddWaveBuf(&device->hidden->driver, 0, &device->hidden->buffer[current]);
     } else if (!audrvVoiceIsPlaying(&device->hidden->driver, 0)) {
@@ -191,7 +191,7 @@ static void SWITCHAUDIO_CloseDevice(SDL_AudioDevice *device)
     }
 
     if (device->hidden->buffer_tmp) {
-        free(device->hidden->buffer_tmp);
+        SDL_free(device->hidden->buffer_tmp);
     }
 
     SDL_free(device->hidden);
