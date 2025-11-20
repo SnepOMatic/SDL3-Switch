@@ -245,17 +245,6 @@ static void SDLCALL SDL_MouseIntegerModeChanged(void *userdata, const char *name
     }
 }
 
-static void SDLCALL SDL_MouseIntegerModeChanged(void *userdata, const char *name, const char *oldValue, const char *hint)
-{
-    SDL_Mouse *mouse = (SDL_Mouse *)userdata;
-
-    if (hint && *hint) {
-        mouse->integer_mode_flags = (Uint8)SDL_atoi(hint);
-    } else {
-        mouse->integer_mode_flags = 0;
-    }
-}
-
 // Public functions
 bool SDL_PreInitMouse(void)
 {
