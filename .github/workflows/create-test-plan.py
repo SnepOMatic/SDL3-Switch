@@ -737,6 +737,7 @@ def spec_to_job(spec: JobSpec, key: str, trackmem_symbol_names: bool) -> JobDeta
         case SdlPlatform.Switch:
             job.cmake_generator = "Unix Makefiles"
             job.cmake_build_arguments.append("-j$(nproc)")
+            job.cmake_arguments.extend(("-DEGL_NO_PLATFORM_SPECIFIC_TYPES"))
             job.ccache = False
             job.shared = False
             job.apt_packages = []
