@@ -71,7 +71,7 @@ static const int sig_list[] = {
 
 static void *RunThread(void *data)
 {
-#ifdef SDL_PLATFORM_ANDROID
+#if defined(SDL_PLATFORM_ANDROID)
     Android_JNI_SetupThread();
 #endif
     SDL_RunThread((SDL_Thread *)data);
@@ -145,7 +145,7 @@ void SDL_SYS_SetupThread(const char *name)
 #endif
         }
 #elif defined(HAVE_PTHREAD_SETNAME_NP)
-#ifdef SDL_PLATFORM_NETBSD
+#if defined(SDL_PLATFORM_NETBSD)
         pthread_setname_np(pthread_self(), "%s", name);
 #else
         if (pthread_setname_np(pthread_self(), name) == ERANGE) {
@@ -164,7 +164,7 @@ void SDL_SYS_SetupThread(const char *name)
 #endif
     }
 
-#if defined(HAVE_SIGNAL_H) &&  (!defined(SDL_PLATFORM_SWITCH) || SDL_PLATFORM_SWITCH == 0)
+#if defined(HAVE_SIGNAL_H) &&  !defined(SDL_PLATFORM_SWITCH)
     // Mask asynchronous signals for this thread
     sigemptyset(&mask);
     for (i = 0; sig_list[i]; ++i) {
@@ -173,7 +173,7 @@ void SDL_SYS_SetupThread(const char *name)
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
 #endif
 
-#ifdef PTHREAD_CANCEL_ASYNCHRONOUS
+#if defined(PTHREAD_CANCEL_ASYNCHRONOUS)
     // Allow ourselves to be asynchronously cancelled
     {
         int oldstate;
@@ -189,10 +189,10 @@ SDL_ThreadID SDL_GetCurrentThreadID(void)
 
 bool SDL_SYS_SetThreadPriority(SDL_ThreadPriority priority)
 {
-#ifdef SDL_PLATFORM_RISCOS
+#if defined(SDL_PLATFORM_RISCOS)
     // FIXME: Setting thread priority does not seem to be supported
     return true;
-#elif SDL_PLATFORM_SWITCH
+#elif defined(SDL_PLATFORM_SWITCH)
     Result res;
     if (priority == SDL_THREAD_PRIORITY_HIGH) {
         res = svcSetThreadPriority(CUR_THREAD_HANDLE, 0x2B);
@@ -261,7 +261,7 @@ bool SDL_SYS_SetThreadPriority(SDL_ThreadPriority priority)
         policy = pri_policy;
     }
 
-#ifdef SDL_PLATFORM_LINUX
+#if defined(SDL_PLATFORM_LINUX)
     {
         pid_t linuxTid = syscall(SYS_gettid);
         return SDL_SetLinuxThreadPriorityAndPolicy(linuxTid, priority, policy);
