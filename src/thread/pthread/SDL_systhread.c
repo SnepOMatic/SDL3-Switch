@@ -61,7 +61,7 @@
 #include <switch.h>
 #endif
 
-#if defined(HAVE_SIGNAL_H) && !SDL_PLATFORM_SWITCH
+#if defined(HAVE_SIGNAL_H) && (!defined(SDL_PLATFORM_SWITCH) || SDL_PLATFORM_SWITCH == 0)
 // List of signals to mask in the subthreads
 static const int sig_list[] = {
     SIGHUP, SIGINT, SIGQUIT, SIGPIPE, SIGALRM, SIGTERM, SIGCHLD, SIGWINCH,
@@ -125,7 +125,7 @@ bool SDL_SYS_CreateThread(SDL_Thread *thread,
 
 void SDL_SYS_SetupThread(const char *name)
 {
-#if defined(HAVE_SIGNAL_H) && !SDL_PLATFORM_SWITCH
+#if defined(HAVE_SIGNAL_H) && (!defined(SDL_PLATFORM_SWITCH) || SDL_PLATFORM_SWITCH == 0)
     int i;
     sigset_t mask;
 #endif
@@ -164,7 +164,7 @@ void SDL_SYS_SetupThread(const char *name)
 #endif
     }
 
-#if defined(HAVE_SIGNAL_H) && !SDL_PLATFORM_SWITCH
+#if defined(HAVE_SIGNAL_H) && (!defined(SDL_PLATFORM_SWITCH) || SDL_PLATFORM_SWITCH == 0)
     // Mask asynchronous signals for this thread
     sigemptyset(&mask);
     for (i = 0; sig_list[i]; ++i) {
