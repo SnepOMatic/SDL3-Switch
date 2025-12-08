@@ -7189,6 +7189,8 @@ static VkRenderPass VULKAN_INTERNAL_FetchRenderPass(
     key.sampleCount = VK_SAMPLE_COUNT_1_BIT;
     if (numColorTargets > 0) {
         key.sampleCount = SDLToVK_SampleCount[((VulkanTextureContainer *)colorTargetInfos[0].texture)->header.info.sample_count];
+    } else if (numColorTargets == 0 && depthStencilTargetInfo != NULL) {
+        key.sampleCount = SDLToVK_SampleCount[((VulkanTextureContainer *)depthStencilTargetInfo->texture)->header.info.sample_count];
     }
 
     key.numColorTargets = numColorTargets;
@@ -10808,8 +10810,6 @@ static bool VULKAN_INTERNAL_DefragmentMemory(
         VulkanMemoryUsedRegion *currentRegion = allocation->usedRegions[i];
 
         if (currentRegion->isBuffer && !currentRegion->vulkanBuffer->markedForDestroy) {
-            currentRegion->vulkanBuffer->usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
             VulkanBuffer *newBuffer = VULKAN_INTERNAL_CreateBuffer(
                 renderer,
                 currentRegion->vulkanBuffer->size,

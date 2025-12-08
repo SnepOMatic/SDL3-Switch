@@ -130,6 +130,7 @@ static bool xinput2_version_atleast(const int version, const int wantmajor, cons
     return version >= ((wantmajor * 1000) + wantminor);
 }
 
+// !!! FIXME: isn't this just X11_FindWindow?
 static SDL_WindowData *xinput2_get_sdlwindowdata(SDL_VideoData *videodata, Window window)
 {
     int i;
@@ -512,6 +513,17 @@ void X11_HandleXinput2Event(SDL_VideoDevice *_this, XGenericEventCookie *cookie)
     //case XI_PropertyEvent:
     //case XI_DeviceChanged:
 
+    case XI_PropertyEvent:
+    {
+        const XIPropertyEvent *proev = (const XIPropertyEvent *)cookie->data;
+        // Handle pen proximity enter/leave
+        if (proev->what == XIPropertyModified && proev->property == videodata->atoms.pen_atom_wacom_serial_ids) {
+            const XIDeviceEvent *xev = (const XIDeviceEvent *)cookie->data;
+            SDL_WindowData *windowdata = X11_FindWindow(_this, xev->event);
+            X11_NotifyPenProximityChange(_this, windowdata ? windowdata->window : NULL, proev->deviceid);
+        }
+    } break;
+
     case XI_RawMotion:
     {
         const XIRawEvent *rawev = (const XIRawEvent *)cookie->data;
@@ -601,7 +613,7 @@ void X11_HandleXinput2Event(SDL_VideoDevice *_this, XGenericEventCookie *cookie)
             } else {
                 SDL_SendPenButton(0, pen->pen, window, button - 1, down);
             }
-        } else {
+        } else if (!pointer_emulated) {
             // Otherwise assume a regular mouse
             SDL_WindowData *windowdata = xinput2_get_sdlwindowdata(videodata, xev->event);
             int x_ticks = 0, y_ticks = 0;
@@ -615,12 +627,8 @@ void X11_HandleXinput2Event(SDL_VideoDevice *_this, XGenericEventCookie *cookie)
 
             /* Discard wheel events from "Master" devices to avoid duplicates,
              * as coarse wheel events are stateless and can't be deduplicated.
-             *
-             * If the pointer emulation flag is set on a wheel event, it is being
-             * emulated from a scroll valuator, which will be handled natively.
              */
-            if ((pointer_emulated || xev->deviceid != xev->sourceid) &&
-                X11_IsWheelEvent(button, &x_ticks, &y_ticks)) {
+            if (xev->deviceid != xev->sourceid && X11_IsWheelEvent(button, &x_ticks, &y_ticks)) {
                 break;
             }
 

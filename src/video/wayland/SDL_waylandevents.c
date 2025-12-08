@@ -3301,6 +3301,11 @@ static void tablet_tool_handle_capability(void *data, struct zwp_tablet_tool_v2 
 
 static void tablet_tool_handle_done(void *data, struct zwp_tablet_tool_v2 *tool)
 {
+    SDL_WaylandPenTool *sdltool = (SDL_WaylandPenTool *) data;
+    if (sdltool->info.subtype != SDL_PEN_TYPE_UNKNOWN) {   // don't tell SDL about it if we don't know its role.
+        SDL_Window *window = sdltool->focus ? sdltool->focus->sdlwindow : NULL;
+        sdltool->instance_id = SDL_AddPenDevice(0, NULL, window, &sdltool->info, sdltool, false);
+    }
 }
 
 static void tablet_tool_handle_removed(void *data, struct zwp_tablet_tool_v2 *tool)
@@ -3323,7 +3328,8 @@ static void tablet_tool_handle_proximity_in(void *data, struct zwp_tablet_tool_v
     SDL_WindowData *windowdata = surface ? Wayland_GetWindowDataForOwnedSurface(surface) : NULL;
     sdltool->focus = windowdata;
     sdltool->proximity_serial = serial;
-    sdltool->frame.have_proximity_in = true;
+    sdltool->frame.have_proximity = true;
+    sdltool->frame.in_proximity = true;
 
     // According to the docs, this should be followed by a frame event, where we'll send our SDL events.
 }
@@ -3331,7 +3337,8 @@ static void tablet_tool_handle_proximity_in(void *data, struct zwp_tablet_tool_v
 static void tablet_tool_handle_proximity_out(void *data, struct zwp_tablet_tool_v2 *tool)
 {
     SDL_WaylandPenTool *sdltool = (SDL_WaylandPenTool *) data;
-    sdltool->frame.have_proximity_out = true;
+    sdltool->frame.have_proximity = true;
+    sdltool->frame.in_proximity = false;
 }
 
 static void tablet_tool_handle_down(void *data, struct zwp_tablet_tool_v2 *tool, uint32_t serial)
@@ -3408,7 +3415,7 @@ static void tablet_tool_handle_button(void *data, struct zwp_tablet_tool_v2 *too
     }
 
     SDL_assert((sdlbutton >= 1) && (sdlbutton <= SDL_arraysize(sdltool->frame.buttons)));
-    sdltool->frame.buttons[sdlbutton-1] = (state == ZWP_TABLET_PAD_V2_BUTTON_STATE_PRESSED) ? 1 : 0;
+    sdltool->frame.buttons[sdlbutton-1] = (state == ZWP_TABLET_PAD_V2_BUTTON_STATE_PRESSED) ? WAYLAND_TABLET_TOOL_BUTTON_DOWN : WAYLAND_TABLET_TOOL_BUTTON_UP;
 }
 
 static void tablet_tool_handle_rotation(void *data, struct zwp_tablet_tool_v2 *tool, wl_fixed_t degrees)
@@ -3434,29 +3441,24 @@ static void tablet_tool_handle_wheel(void *data, struct zwp_tablet_tool_v2 *tool
 static void tablet_tool_handle_frame(void *data, struct zwp_tablet_tool_v2 *tool, uint32_t time)
 {
     SDL_WaylandPenTool *sdltool = (SDL_WaylandPenTool *) data;
+    const SDL_PenID instance_id = sdltool->instance_id;
+    if (!instance_id) {
+        return;  // Not a pen we report on.
+    }
 
     const Uint64 timestamp = Wayland_AdjustEventTimestampBase(Wayland_EventTimestampMSToNS(time));
     SDL_Window *window = sdltool->focus ? sdltool->focus->sdlwindow : NULL;
 
-    if (sdltool->frame.have_proximity_in) {
-        SDL_assert(sdltool->instance_id == 0);  // shouldn't be added at this point.
-        if (sdltool->info.subtype != SDL_PEN_TYPE_UNKNOWN) {   // don't tell SDL about it if we don't know its role.
-            sdltool->instance_id = SDL_AddPenDevice(timestamp, NULL, window, &sdltool->info, sdltool);
-            Wayland_TabletToolUpdateCursor(sdltool);
-        }
-    }
-
-    const SDL_PenID instance_id = sdltool->instance_id;
-
-    if (!instance_id) {
-        return;  // Not a pen we report on.
+    if (sdltool->frame.have_proximity && sdltool->frame.in_proximity) {
+        SDL_SendPenProximity(timestamp, instance_id, window, true);
+        Wayland_TabletToolUpdateCursor(sdltool);
     }
 
     // !!! FIXME: Should hit testing be done if pens generate pointer motion?
 
     // I don't know if this is necessary (or makes sense), but send motion before pen downs, but after pen ups, so you don't get unexpected lines drawn.
     if (sdltool->frame.have_motion && sdltool->frame.tool_state) {
-        if (sdltool->frame.tool_state == WAYLAND_TABLET_TOOL_STATE_UP) {
+        if (sdltool->frame.tool_state == WAYLAND_TABLET_TOOL_STATE_DOWN) {
             SDL_SendPenMotion(timestamp, instance_id, window, sdltool->frame.x, sdltool->frame.y);
             SDL_SendPenTouch(timestamp, instance_id, window, false, true);  // !!! FIXME: how do we know what tip is in use?
         } else {
@@ -3486,11 +3488,10 @@ static void tablet_tool_handle_frame(void *data, struct zwp_tablet_tool_v2 *tool
         }
     }
 
-    if (sdltool->frame.have_proximity_out) {
+    if (sdltool->frame.have_proximity && !sdltool->frame.in_proximity) {
+        SDL_SendPenProximity(timestamp, instance_id, window, false);
         sdltool->focus = NULL;
         Wayland_TabletToolUpdateCursor(sdltool);
-        SDL_RemovePenDevice(timestamp, window, sdltool->instance_id);
-        sdltool->instance_id = 0;
     }
 
     // Reset for the next frame.

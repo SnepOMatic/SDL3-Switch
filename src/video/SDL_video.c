@@ -304,20 +304,6 @@ static Uint32 SDL_DefaultGraphicsBackends(SDL_VideoDevice *_this)
     return 0;
 }
 
-static void SDLCALL SDL_CleanupWindowTextureData(void *userdata, void *value)
-{
-    SDL_WindowTextureData *data = (SDL_WindowTextureData *)value;
-
-    if (data->texture) {
-        SDL_DestroyTexture(data->texture);
-    }
-    if (data->renderer) {
-        SDL_DestroyRenderer(data->renderer);
-    }
-    SDL_free(data->pixels);
-    SDL_free(data);
-}
-
 static bool SDL_CreateWindowTexture(SDL_VideoDevice *_this, SDL_Window *window, SDL_PixelFormat *format, void **pixels, int *pitch)
 {
     SDL_PropertiesID props = SDL_GetWindowProperties(window);
@@ -408,7 +394,7 @@ static bool SDL_CreateWindowTexture(SDL_VideoDevice *_this, SDL_Window *window, 
             SDL_DestroyRenderer(renderer);
             return false;
         }
-        if (!SDL_SetPointerPropertyWithCleanup(props, SDL_PROP_WINDOW_TEXTUREDATA_POINTER, data, SDL_CleanupWindowTextureData, NULL)) {
+        if (!SDL_SetPointerProperty(props, SDL_PROP_WINDOW_TEXTUREDATA_POINTER, data)) {
             SDL_DestroyRenderer(renderer);
             return false;
         }
@@ -537,7 +523,21 @@ static bool SDL_UpdateWindowTexture(SDL_VideoDevice *_this, SDL_Window *window, 
 
 static void SDL_DestroyWindowTexture(SDL_VideoDevice *_this, SDL_Window *window)
 {
-    SDL_ClearProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_TEXTUREDATA_POINTER);
+    SDL_PropertiesID props = SDL_GetWindowProperties(window);
+    if (SDL_HasProperty(props, SDL_PROP_WINDOW_TEXTUREDATA_POINTER)) {
+        SDL_WindowTextureData *data = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_TEXTUREDATA_POINTER, NULL);
+
+        if (data->texture) {
+            SDL_DestroyTexture(data->texture);
+        }
+        if (data->renderer) {
+            SDL_DestroyRenderer(data->renderer);
+        }
+        SDL_free(data->pixels);
+        SDL_free(data);
+
+        SDL_ClearProperty(props, SDL_PROP_WINDOW_TEXTUREDATA_POINTER);
+    }
 }
 
 static SDL_VideoDevice *_this = NULL;
@@ -2206,7 +2206,7 @@ SDL_PixelFormat SDL_GetWindowPixelFormat(SDL_Window *window)
 }
 
 #define CREATE_FLAGS \
-    (SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_POPUP_MENU | SDL_WINDOW_UTILITY | SDL_WINDOW_TOOLTIP | SDL_WINDOW_VULKAN | SDL_WINDOW_MINIMIZED | SDL_WINDOW_METAL | SDL_WINDOW_TRANSPARENT | SDL_WINDOW_NOT_FOCUSABLE)
+    (SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_POPUP_MENU | SDL_WINDOW_UTILITY | SDL_WINDOW_TOOLTIP | SDL_WINDOW_VULKAN | SDL_WINDOW_MINIMIZED | SDL_WINDOW_METAL | SDL_WINDOW_TRANSPARENT | SDL_WINDOW_NOT_FOCUSABLE | SDL_WINDOW_FILL_DOCUMENT)
 
 static SDL_INLINE bool IsAcceptingDragAndDrop(void)
 {
@@ -2563,6 +2563,10 @@ SDL_Window *SDL_CreateWindowWithProperties(SDL_PropertiesID props)
     window->displayID = SDL_GetDisplayForWindow(window);
     window->external_graphics_context = external_graphics_context;
     window->constrain_popup = SDL_GetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_CONSTRAIN_POPUP_BOOLEAN, true);
+
+    if (!_this->SetWindowFillDocument) {
+        window->flags &= ~SDL_WINDOW_FILL_DOCUMENT;  // not an error, just unsupported here, so remove the flag.
+    }
 
     if (_this->windows) {
         _this->windows->prev = window;
@@ -3921,6 +3925,25 @@ bool SDL_SetWindowFocusable(SDL_Window *window, bool focusable)
     return true;
 }
 
+bool SDL_SetWindowFillDocument(SDL_Window *window, bool fill)
+{
+    CHECK_WINDOW_MAGIC(window, false);
+
+    const bool want = (fill != false); // normalize the flag.
+    const bool have = ((window->flags & SDL_WINDOW_FILL_DOCUMENT) != 0);
+    if ((want != have) && (_this->SetWindowFillDocument)) {
+        if (!_this->SetWindowFillDocument(_this, window, want)) {
+            return false;
+        } else if (want) {
+            window->flags |= SDL_WINDOW_FILL_DOCUMENT;
+        } else {
+            window->flags &= ~SDL_WINDOW_FILL_DOCUMENT;
+        }
+    }
+
+    return true;
+}
+
 void SDL_UpdateWindowGrab(SDL_Window *window)
 {
     bool keyboard_grabbed, mouse_grabbed;
@@ -4499,6 +4522,8 @@ void SDL_DestroyWindow(SDL_Window *window)
     }
 
     SDL_DestroyProperties(window->text_input_props);
+
+    SDL_DestroyWindowTexture(_this, window);
     SDL_DestroyProperties(window->props);
 
     /* Clear the modal status, but don't unset the parent just yet, as it
@@ -4631,6 +4656,8 @@ void SDL_VideoQuit(void)
     if (!_this) {
         return;
     }
+
+    _this->is_quitting = true;
 
     // Halt event processing before doing anything else
 #if 0 // This was moved to the end to fix a memory leak
