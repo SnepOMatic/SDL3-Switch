@@ -256,7 +256,7 @@ def main():
     all_level_keys = (
         # Level 1
         (
-            "haiku",
+            "switch",
         ),
     )
 
