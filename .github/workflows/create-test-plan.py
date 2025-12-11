@@ -102,6 +102,7 @@ class JobDetails:
             "artifact": self.artifact,
             "enable-artifacts": enable_artifacts,
             "shell": self.shell,
+            "apt-packages": my_shlex_join(self.apt_packages),
             "test-pkg-config": self.test_pkg_config,
             "pollute-directories": my_shlex_join(self.pollute_directories),
             "no-cmake": self.no_cmake,
