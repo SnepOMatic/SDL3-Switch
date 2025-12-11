@@ -25,40 +25,17 @@ class JobSpec:
     artifact: Optional[str]
     container: Optional[str] = None
     no_cmake: bool = False
-    xcode: bool = False
-    android_mk: bool = False
-    android_gradle: bool = False
     lean: bool = False
-    android_arch: Optional[str] = None
-    android_abi: Optional[str] = None
-    android_platform: Optional[int] = None
-    msys2_platform: Optional[Msys2Platform] = None
-    intel: Optional[IntelCompiler] = None
-    apple_framework: Optional[bool] = None
-    apple_archs: Optional[set[AppleArch]] = None
-    msvc_project: Optional[str] = None
-    msvc_arch: Optional[MsvcArch] = None
     clang_cl: bool = False
     gdk: bool = False
-    vita_gles: Optional[VitaGLES] = None
     more_hard_deps: bool = False
 
 JOB_SPECS = {
-    "switch": JobSpec(name="Nintendo Switch",                               os=JobOs.UbuntuLatest,      platform=SdlPlatform.Switch,      artifact="SDL-switch",             container="devkitpro/devkita64:latest", ),
+    "switch": JobSpec(name="Nintendo Switch", os=JobOs.UbuntuLatest, platform=SdlPlatform.Switch, artifact="SDL-switch", container="devkitpro/devkita64:latest", ),
 }
 
 class StaticLibType(Enum):
-    STATIC_LIB = "SDL3-static.lib"
     A = "libSDL3.a"
-
-
-class SharedLibType(Enum):
-    WIN32 = "SDL3.dll"
-    SO_0 = "libSDL3.so.0"
-    SO = "libSDL3.so"
-    DYLIB = "libSDL3.0.dylib"
-    FRAMEWORK = "SDL3.framework/Versions/A/SDL3"
-
 
 @dataclasses.dataclass(slots=True)
 class JobDetails:
@@ -75,9 +52,6 @@ class JobDetails:
     shell: str = "sh"
     sudo: str = "sudo"
     cmake_config_emulator: str = ""
-    apk_packages: list[str] = dataclasses.field(default_factory=list)
-    apt_packages: list[str] = dataclasses.field(default_factory=list)
-    brew_packages: list[str] = dataclasses.field(default_factory=list)
     cmake_toolchain_file: str = ""
     cmake_arguments: list[str] = dataclasses.field(default_factory=list)
     cmake_generator: str = "Ninja"
@@ -93,31 +67,16 @@ class JobDetails:
     use_cmake: bool = True
     shared: bool = True
     static: bool = True
-    shared_lib: Optional[SharedLibType] = None
     static_lib: Optional[StaticLibType] = None
     run_tests: bool = True
     test_pkg_config: bool = True
     cc_from_cmake: bool = False
     source_cmd: str = ""
     pretest_cmd: str = ""
-    java: bool = False
-    android_apks: list[str] = dataclasses.field(default_factory=list)
-    android_ndk: bool = False
-    android_mk: bool = False
-    android_gradle: bool = False
     minidump: bool = False
-    intel: bool = False
-    msys2_msystem: str = ""
-    msys2_env: str = ""
-    msys2_no_perl: bool = False
     werror: bool = True
-    msvc_vcvars_arch: str = ""
-    msvc_vcvars_sdk: str = ""
-    msvc_project: str = ""
-    msvc_project_flags: list[str] = dataclasses.field(default_factory=list)
     setup_ninja: bool = False
     setup_libusb_arch: str = ""
-    xcode_sdk: str = ""
     cpactions: bool = False
     setup_gdk_folder: str = ""
     cpactions_os: str = ""
@@ -143,16 +102,7 @@ class JobDetails:
             "artifact": self.artifact,
             "enable-artifacts": enable_artifacts,
             "shell": self.shell,
-            "msys2-msystem": self.msys2_msystem,
-            "msys2-env": self.msys2_env,
-            "msys2-no-perl": self.msys2_no_perl,
-            "android-ndk": self.android_ndk,
-            "java": self.java,
-            "intel": self.intel,
-            "apk-packages": my_shlex_join(self.apk_packages),
-            "apt-packages": my_shlex_join(self.apt_packages),
             "test-pkg-config": self.test_pkg_config,
-            "brew-packages": my_shlex_join(self.brew_packages),
             "pollute-directories": my_shlex_join(self.pollute_directories),
             "no-cmake": self.no_cmake,
             "build-tests": self.build_tests,
@@ -171,35 +121,24 @@ class JobDetails:
             "cmake-build-arguments": my_shlex_join(self.cmake_build_arguments),
             "shared": self.shared,
             "static": self.static,
-            "shared-lib": self.shared_lib.value if self.shared_lib else None,
             "static-lib": self.static_lib.value if self.static_lib else None,
             "cmake-build-type": self.cmake_build_type,
             "run-tests": self.run_tests,
-            "android-apks": my_shlex_join(self.android_apks),
-            "android-gradle": self.android_gradle,
-            "android-mk": self.android_mk,
             "werror": self.werror,
             "sudo": self.sudo,
-            "msvc-vcvars-arch": self.msvc_vcvars_arch,
-            "msvc-vcvars-sdk": self.msvc_vcvars_sdk,
-            "msvc-project": self.msvc_project,
-            "msvc-project-flags": my_shlex_join(self.msvc_project_flags),
             "setup-ninja": self.setup_ninja,
             "setup-libusb-arch": self.setup_libusb_arch,
             "cc-from-cmake": self.cc_from_cmake,
-            "xcode-sdk": self.xcode_sdk,
             "cpactions": self.cpactions,
             "cpactions-os": self.cpactions_os,
             "cpactions-version": self.cpactions_version,
             "cpactions-arch": self.cpactions_arch,
             "cpactions-setup-cmd": self.cpactions_setup_cmd,
             "cpactions-install-cmd": self.cpactions_install_cmd,
-            "setup-vita-gles-type": self.setup_vita_gles_type,
             "setup-gdk-folder": self.setup_gdk_folder,
             "check-sources": self.check_sources,
             "setup-python": self.setup_python,
             "pypi-packages": my_shlex_join(self.pypi_packages),
-            "setup-ngage-sdk-path": self.setup_gage_sdk_path,
             "binutils-strings": self.binutils_strings,
         }
         return {k: v for k, v in data.items() if v != ""}
@@ -237,37 +176,10 @@ def spec_to_job(spec: JobSpec, key: str, trackmem_symbol_names: bool) -> JobDeta
         pretest_cmd.append("export SDL_TRACKMEM_SYMBOL_NAMES=1")
     else:
         pretest_cmd.append("export SDL_TRACKMEM_SYMBOL_NAMES=0")
-    win32 = spec.platform in (SdlPlatform.Msys2, SdlPlatform.Msvc)
     fpic = None
     build_parallel = True
     if spec.lean:
         job.cppflags.append("-DSDL_LEAN_AND_MEAN=1")
-    if win32:
-        job.cmake_arguments.append("-DSDLTEST_PROCDUMP=ON")
-        job.minidump = True
-    if spec.intel is not None:
-        match spec.intel:
-            case IntelCompiler.Icx:
-                job.cc = "icx"
-                job.cxx = "icpx"
-            case IntelCompiler.Icc:
-                job.cc = "icc"
-                job.cxx = "icpc"
-                # Disable deprecation warning
-                job.cppflags.append("-diag-disable=10441")
-                # Avoid 'Catastrophic error: cannot open precompiled header file'
-                job.cmake_arguments.append("-DCMAKE_DISABLE_PRECOMPILE_HEADERS:BOOL=ON")
-                job.clang_tidy = False
-            case _:
-                raise ValueError(f"Invalid intel={spec.intel}")
-        job.source_cmd = f"source /opt/intel/oneapi/setvars.sh;"
-        job.intel = True
-        job.shell = "bash"
-        job.cmake_arguments.extend((
-            f"-DCMAKE_C_COMPILER={job.cc}",
-            f"-DCMAKE_CXX_COMPILER={job.cxx}",
-            "-DCMAKE_SYSTEM_NAME=Linux",
-        ))
     match spec.platform:
         case SdlPlatform.Switch:
             job.cmake_generator = "Unix Makefiles"
