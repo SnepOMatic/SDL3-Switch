@@ -52,6 +52,7 @@ class JobDetails:
     shell: str = "sh"
     sudo: str = "sudo"
     cmake_config_emulator: str = ""
+    apt_packages: list[str] = dataclasses.field(default_factory=list)
     cmake_toolchain_file: str = ""
     cmake_arguments: list[str] = dataclasses.field(default_factory=list)
     cmake_generator: str = "Ninja"
