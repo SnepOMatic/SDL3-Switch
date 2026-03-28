@@ -46,6 +46,7 @@ endif()
 
 include(CheckLibraryExists)
 include(CheckIncludeFile)
+include(CheckIncludeFiles)
 include(CheckLanguage)
 include(CheckSymbolExists)
 include(CheckCSourceCompiles)
@@ -216,6 +217,10 @@ else()
   set(SDL_OSS_DEFAULT OFF)
 endif()
 
+if(NOT SDL_SHARED_AVAILABLE)
+  set(SDL_SHARED_DEFAULT OFF)
+endif()
+
 if(SDL_SHARED_DEFAULT AND SDL_STATIC_DEFAULT AND SDL_SHARED_AVAILABLE)
   if(DEFINED BUILD_SHARED_LIBS)
     # When defined, use BUILD_SHARED_LIBS as default
@@ -378,7 +383,7 @@ dep_option(SDL_DUMMYCAMERA         "Support the dummy camera driver" ON SDL_CAME
 option_string(SDL_BACKGROUNDING_SIGNAL "number to use for magic backgrounding signal or 'OFF'" OFF)
 option_string(SDL_FOREGROUNDING_SIGNAL "number to use for magic foregrounding signal or 'OFF'" OFF)
 dep_option(SDL_HIDAPI              "Enable the HIDAPI subsystem" ON "NOT VISIONOS" OFF)
-dep_option(SDL_HIDAPI_LIBUSB       "Use libusb for low level joystick drivers" ON SDL_HIDAPI_LIBUSB_AVAILABLE OFF)
+dep_option(SDL_HIDAPI_LIBUSB       "Use libusb for low level joystick drivers" ON "SDL_HIDAPI;SDL_HIDAPI_LIBUSB_AVAILABLE" OFF)
 dep_option(SDL_HIDAPI_LIBUSB_SHARED "Dynamically load libusb support" ON "SDL_HIDAPI_LIBUSB;SDL_DEPS_SHARED" OFF)
 dep_option(SDL_HIDAPI_JOYSTICK     "Use HIDAPI for low level joystick drivers" ON SDL_HIDAPI OFF)
 dep_option(SDL_VIRTUAL_JOYSTICK    "Enable the virtual-joystick driver" ON SDL_HIDAPI OFF)
@@ -386,11 +391,21 @@ set_option(SDL_LIBUDEV             "Enable libudev support" ON)
 set_option(SDL_ASAN                "Use AddressSanitizer to detect memory errors" OFF)
 set_option(SDL_CCACHE              "Use Ccache to speed up build" OFF)
 set_option(SDL_CLANG_TIDY          "Run clang-tidy static analysis" OFF)
+dep_option(SDL_GPU_OPENXR          "Build SDL_GPU with OpenXR support" ON "SDL_GPU;NOT RISCOS" OFF)
 
 set(SDL_VENDOR_INFO "" CACHE STRING "Vendor name and/or version to add to SDL_REVISION")
 
-cmake_dependent_option(SDL_SHARED "Build a shared version of the library" ${SDL_SHARED_DEFAULT} ${SDL_SHARED_AVAILABLE} OFF)
-cmake_dependent_option(SDL_STATIC "Build a static version of the library" ${SDL_STATIC_DEFAULT} ${SDL_STATIC_AVAILABLE} OFF)
+if(DEFINED CACHE{SDL_SHARED} OR DEFINED CACHE{SDL_STATIC})
+  cmake_dependent_option(SDL_SHARED "Build a shared version of the library" ${SDL_SHARED_DEFAULT} SDL_SHARED_AVAILABLE OFF)
+  cmake_dependent_option(SDL_STATIC "Build a static version of the library" ${SDL_STATIC_DEFAULT} SDL_STATIC_AVAILABLE OFF)
+else()
+  if(NOT DEFINED SDL_SHARED)
+    set(SDL_SHARED ${SDL_SHARED_DEFAULT})
+  endif()
+  if(NOT DEFINED SDL_STATIC)
+    set(SDL_STATIC ${SDL_STATIC_DEFAULT})
+  endif()
+endif()
 option(SDL_TEST_LIBRARY   "Build the SDL3_test library" ON)
 
 dep_option(SDL_TESTS           "Build the test directory" ${SDL3_MAINPROJECT} SDL_TEST_LIBRARY OFF)
@@ -658,12 +673,7 @@ if(USE_GCC OR USE_CLANG OR USE_INTELCC OR USE_QCC)
     endif()
   endif()
 
-  if(APPLE)
-    check_linker_flag(C "-Wl,-undefined,error" LINKER_SUPPORTS_WL_UNDEFINED_ERROR)
-    if(LINKER_SUPPORTS_WL_UNDEFINED_ERROR)
-      sdl_shared_link_options("-Wl,-undefined,error")
-    endif()
-  elseif(NOT OPENBSD)
+  if(NOT OPENBSD)
     cmake_push_check_state()
     check_linker_flag(C "-Wl,--no-undefined" LINKER_SUPPORTS_WL_NO_UNDEFINED)
     #FIXME: originally this if had an additional "AND NOT (USE_CLANG AND WINDOWS)"
@@ -1258,6 +1268,8 @@ sdl_glob_sources(
   "${SDL3_SOURCE_DIR}/src/filesystem/*.h"
   "${SDL3_SOURCE_DIR}/src/gpu/*.c"
   "${SDL3_SOURCE_DIR}/src/gpu/*.h"
+  "${SDL3_SOURCE_DIR}/src/gpu/xr/*.c"
+  "${SDL3_SOURCE_DIR}/src/gpu/xr/*.h"
   "${SDL3_SOURCE_DIR}/src/joystick/*.c"
   "${SDL3_SOURCE_DIR}/src/joystick/*.h"
   "${SDL3_SOURCE_DIR}/src/haptic/*.c"
@@ -1294,22 +1306,25 @@ sdl_glob_sources(
   "${SDL3_SOURCE_DIR}/src/video/yuv2rgb/*.h"
 )
 
-# Build uclibc as a static library such that non-used symbols don't end up in the SDL3 shared library.
 file(GLOB SDL_UCLIBC_SOURCES "${SDL3_SOURCE_DIR}/src/libm/*.c")
-add_library(SDL_uclibc STATIC "${SDL_UCLIBC_SOURCES}")
-target_compile_definitions(SDL_uclibc PRIVATE USING_GENERATED_CONFIG_H)
-target_include_directories(SDL_uclibc PRIVATE "${SDL3_BINARY_DIR}/include-config-$<LOWER_CASE:$<CONFIG>>/build_config")
-target_include_directories(SDL_uclibc PRIVATE "${SDL3_SOURCE_DIR}/src")
-target_include_directories(SDL_uclibc PRIVATE "${SDL3_SOURCE_DIR}/include")
-SDL_AddCommonCompilerFlags(SDL_uclibc)
-target_compile_definitions(SDL_uclibc PRIVATE "$<$<CONFIG:Debug>:DEBUG>")
-sdl_sources(STATIC "$<TARGET_OBJECTS:SDL_uclibc>")
-set_property(TARGET SDL_uclibc PROPERTY UNITY_BUILD OFF)
 if(TARGET SDL3-shared)
+  # Build uclibc as a static library such that non-used symbols don't end up in the SDL3 shared library.
+  add_library(SDL_uclibc STATIC ${SDL_UCLIBC_SOURCES})
+  set_property(TARGET SDL_uclibc PROPERTY POSITION_INDEPENDENT_CODE TRUE)
+  target_compile_definitions(SDL_uclibc PRIVATE USING_GENERATED_CONFIG_H)
+  target_include_directories(SDL_uclibc PRIVATE "${SDL3_BINARY_DIR}/include-config-$<LOWER_CASE:$<CONFIG>>/build_config")
+  target_include_directories(SDL_uclibc PRIVATE "${SDL3_SOURCE_DIR}/src")
+  target_include_directories(SDL_uclibc PRIVATE "${SDL3_SOURCE_DIR}/include")
+  SDL_AddCommonCompilerFlags(SDL_uclibc)
+  target_compile_definitions(SDL_uclibc PRIVATE "$<$<CONFIG:Debug>:DEBUG>")
+  set_property(TARGET SDL_uclibc PROPERTY UNITY_BUILD OFF)
   target_link_libraries(SDL3-shared PRIVATE SDL_uclibc)
+  if(HAVE_GCC_FVISIBILITY)
+    set_property(TARGET SDL_uclibc PROPERTY C_VISIBILITY_PRESET "hidden")
+  endif()
 endif()
-if(HAVE_GCC_FVISIBILITY)
-  set_property(TARGET SDL_uclibc PROPERTY C_VISIBILITY_PRESET "hidden")
+if(TARGET SDL3-static)
+  target_sources(SDL3-static PRIVATE ${SDL_UCLIBC_SOURCES})
 endif()
 
 # Enable/disable various subsystems of the SDL library
@@ -1766,6 +1781,7 @@ elseif(EMSCRIPTEN)
 
 elseif(UNIX AND NOT APPLE AND NOT RISCOS AND NOT HAIKU)
 
+  set(SDL_DISABLE_DLOPEN_NOTES TRUE)
   if(SDL_DLOPEN_NOTES)
     set(CHECK_ELF_DLNOTES_SRC [==[
     #ifndef __ELF__
@@ -1778,10 +1794,10 @@ elseif(UNIX AND NOT APPLE AND NOT RISCOS AND NOT HAIKU)
       return argc + dlnote.hdr.a;
     }
     ]==])
-    set(SDL_DISABLE_DLOPEN_NOTES FALSE)
     check_c_source_compiles("${CHECK_ELF_DLNOTES_SRC}" COMPILER_SUPPORTS_ELFNOTES)
-    if(NOT COMPILER_SUPPORTS_ELFNOTES)
-      set(SDL_DISABLE_DLOPEN_NOTES TRUE)
+    if(COMPILER_SUPPORTS_ELFNOTES)
+      set(SDL_DISABLE_DLOPEN_NOTES FALSE)
+      set(HAVE_DLOPEN_NOTES TRUE)
     endif()
   endif()
 
@@ -1793,7 +1809,7 @@ elseif(UNIX AND NOT APPLE AND NOT RISCOS AND NOT HAIKU)
           "${SDL3_SOURCE_DIR}/src/audio/netbsd/*.h"
         )
         set(HAVE_SDL_AUDIO TRUE)
-    elseif(QNX)
+    elseif(QNX AND (CMAKE_SYSTEM_VERSION VERSION_LESS "8.0.0"))
         set(SDL_AUDIO_DRIVER_QNX 1)
         sdl_glob_sources(
           "${SDL3_SOURCE_DIR}/src/audio/qnx/*.c"
@@ -2358,7 +2374,7 @@ elseif(WINDOWS)
   set(HAVE_SDL_STORAGE 1)
 
   # Libraries for Win32 native and MinGW
-  sdl_link_dependency(base LIBS kernel32 user32 gdi32 winmm imm32 ole32 oleaut32 version uuid advapi32 setupapi shell32)
+  sdl_link_dependency(base LIBS kernel32 user32 gdi32 winmm imm32 ole32 oleaut32 version uuid advapi32 setupapi shell32 hid)
 
   set(SDL_TIME_WINDOWS 1)
   sdl_glob_sources("${SDL3_SOURCE_DIR}/src/time/windows/*.c")
@@ -3594,6 +3610,9 @@ if(SDL_GPU)
     set(SDL_VIDEO_RENDER_GPU 1)
     set(HAVE_RENDER_GPU TRUE)
   endif()
+  if(SDL_GPU_OPENXR)
+    set(HAVE_GPU_OPENXR 1)
+  endif()
 endif()
 
 # Dummies
@@ -3752,7 +3771,7 @@ else()
   set(SDL_REVISION "" CACHE STRING "Custom SDL revision (only used when REVISION.txt does not exist)")
 endif()
 if(NOT SDL_REVISION)
-  # If SDL_REVISION is not overrided, use git to describe
+  # If SDL_REVISION is not overridden, use git to describe
   git_describe(SDL_REVISION_GIT)
   set(SDL_REVISION "SDL-${SDL3_VERSION}-${SDL_REVISION_GIT}")
 endif()
@@ -4334,7 +4353,7 @@ if(SDL_INSTALL)
 
   if(ANDROID)
     if(TARGET SDL3-jar)
-      set(SDL_INSTALL_JAVADIR "${CMAKE_INSTALL_DATAROOTDIR}/java" CACHE PATH "Path where to install java clases + java sources")
+      set(SDL_INSTALL_JAVADIR "${CMAKE_INSTALL_DATAROOTDIR}/java" CACHE PATH "Path where to install java classes + java sources")
       set(PROGUARD_RULES_PATH "${CMAKE_CURRENT_SOURCE_DIR}/android-project/app/proguard-rules.pro")
       # install_jar or $<TARGET_PROPERTY:SDL3-jar,INSTALL_FILES> does not work on Windows: a SDL3.jar symlink is not generated
       install(FILES "${CMAKE_CURRENT_BINARY_DIR}/SDL3-${SDL3_VERSION}.jar"

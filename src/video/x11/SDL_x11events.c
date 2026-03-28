@@ -547,11 +547,13 @@ void X11_ReconcileKeyboardState(SDL_VideoDevice *_this)
 
     X11_XQueryKeymap(display, keys);
 
+    const bool *keystate = SDL_GetKeyboardState(NULL);
     for (Uint32 keycode = 0; keycode < SDL_arraysize(videodata->keyboard.key_layout); ++keycode) {
         const SDL_Scancode scancode = videodata->keyboard.key_layout[keycode];
         const bool x11KeyPressed = (keys[keycode / 8] & (1 << (keycode % 8))) != 0;
+        const bool sdlKeyPressed = keystate[scancode];
 
-        if (x11KeyPressed) {
+        if (x11KeyPressed && !sdlKeyPressed) {
             // Only update modifier state for keys that are pressed in another application
             switch (SDL_GetKeyFromScancode(scancode, SDL_KMOD_NONE, false)) {
             case SDLK_LCTRL:
@@ -570,12 +572,15 @@ void X11_ReconcileKeyboardState(SDL_VideoDevice *_this)
             default:
                 break;
             }
+        } else if (!x11KeyPressed && sdlKeyPressed) {
+            X11_HandleModifierKeys(videodata, scancode, false);
+            SDL_SendKeyboardKeyIgnoreModifiers(0, SDL_GLOBAL_KEYBOARD_ID, keycode, scancode, false);
         }
     }
 
     // Update the latched/locked state for modifiers other than Caps, Num, and Scroll lock.
     X11_UpdateSystemKeyModifiers(videodata);
-    X11_ReconcileModifiers(videodata, false);
+    X11_ReconcileModifiers(videodata, true);
 }
 
 static void X11_DispatchFocusIn(SDL_VideoDevice *_this, SDL_WindowData *data)
@@ -1388,13 +1393,12 @@ static void X11_DispatchEvent(SDL_VideoDevice *_this, XEvent *xevent)
 #ifdef DEBUG_XEVENTS
             SDL_Log("window 0x%lx: KeymapNotify!", xevent->xany.window);
 #endif
-            if (!videodata->keyboard.xkb_enabled) {
-                if (SDL_GetKeyboardFocus() != NULL) {
+            if (SDL_GetKeyboardFocus() != NULL) {
+                if (!videodata->keyboard.xkb_enabled) {
                     X11_UpdateKeymap(_this, true);
                 }
+                X11_ReconcileKeyboardState(_this);
             }
-
-            X11_ReconcileKeyboardState(_this);
         } else if (xevent->type == MappingNotify) {
             const int request = xevent->xmapping.request;
 
@@ -1731,7 +1735,7 @@ static void X11_DispatchEvent(SDL_VideoDevice *_this, XEvent *xevent)
             }
 
             // reply with status
-            SDL_memset(&m, 0, sizeof(XClientMessageEvent));
+            SDL_zero(m);
             m.type = ClientMessage;
             m.display = xevent->xclient.display;
             m.window = xevent->xclient.data.l[0];
@@ -1748,7 +1752,7 @@ static void X11_DispatchEvent(SDL_VideoDevice *_this, XEvent *xevent)
         } else if (xevent->xclient.message_type == videodata->atoms.XdndDrop) {
             if (data->xdnd_req == None) {
                 // say again - not interested!
-                SDL_memset(&m, 0, sizeof(XClientMessageEvent));
+                SDL_zero(m);
                 m.type = ClientMessage;
                 m.display = xevent->xclient.display;
                 m.window = xevent->xclient.data.l[0];
@@ -2175,7 +2179,7 @@ static void X11_DispatchEvent(SDL_VideoDevice *_this, XEvent *xevent)
             X11_XFree(p.data);
 
             // send reply
-            SDL_memset(&m, 0, sizeof(XClientMessageEvent));
+            SDL_zero(m);
             m.type = ClientMessage;
             m.display = display;
             m.window = data->xdnd_source;
@@ -2243,7 +2247,7 @@ void X11_SendWakeupEvent(SDL_VideoDevice *_this, SDL_Window *window)
     Window xwindow = window->internal->xwindow;
     XClientMessageEvent event;
 
-    SDL_memset(&event, 0, sizeof(XClientMessageEvent));
+    SDL_zero(event);
     event.type = ClientMessage;
     event.display = req_display;
     event.send_event = True;

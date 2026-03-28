@@ -191,11 +191,6 @@
 #define SDL_VIDEO_RENDER_SW 1
 #endif
 
-/* STB image conversion */
-#if !defined(SDL_HAVE_STB) && !defined(SDL_LEAN_AND_MEAN)
-#define SDL_HAVE_STB 1
-#endif
-
 /* YUV formats
    - handling of YUV surfaces
    - blitting and conversion functions */
@@ -233,6 +228,7 @@
 #undef SDL_GPU_D3D12
 #undef SDL_GPU_METAL
 #undef SDL_GPU_VULKAN
+#undef HAVE_GPU_OPENXR
 #undef SDL_VIDEO_RENDER_GPU
 #endif // SDL_GPU_DISABLED
 
@@ -305,6 +301,9 @@ extern SDL_NORETURN void SDL_ExitProcess(int exitcode);
 
 // Do any initialization that needs to happen before threads are started
 extern void SDL_InitMainThread(void);
+
+// Return true if this thread has initialized video
+extern bool SDL_IsVideoThread(void);
 
 /* The internal implementations of these functions have up to nanosecond precision.
    We can expose these functions as part of the API if we want to later.
