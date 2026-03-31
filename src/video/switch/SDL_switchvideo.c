@@ -108,7 +108,7 @@ static SDL_VideoDevice *SWITCH_CreateDevice()
     device->GL_GetSwapInterval = SWITCH_GLES_GetSwapInterval;
     device->GL_SwapWindow = SWITCH_GLES_SwapWindow;
     device->GL_DestroyContext = SWITCH_GLES_DestroyContext;
-    device->GL_DefaultProfileConfig = SWITCH_GLES_DefaultProfileConfig;
+    device->GL_SetDefaultProfileConfig = SWITCH_GLES_DefaultProfileConfig;
 
     device->StartTextInput = SWITCH_StartTextInput;
     device->StopTextInput = SWITCH_StopTextInput;

@@ -39,7 +39,7 @@ extern bool SWITCH_GLES_LoadLibrary(SDL_VideoDevice *_this, const char *path);
 extern SDL_GLContext SWITCH_GLES_CreateContext(SDL_VideoDevice *_this, SDL_Window *window);
 extern bool SWITCH_GLES_SwapWindow(SDL_VideoDevice *_this, SDL_Window *window);
 extern bool SWITCH_GLES_MakeCurrent(SDL_VideoDevice *_this, SDL_Window *window, SDL_GLContext context);
-extern void SWITCH_GLES_DefaultProfileConfig(SDL_VideoDevice *_this, int *mask, int *major, int *minor);
+extern void SWITCH_GLES_DefaultProfileConfig(SDL_VideoDevice *_this);
 
 #endif /* SDL_VIDEO_DRIVER_SWITCH */
 #endif /* SDL_switchteopengles_h_ */
