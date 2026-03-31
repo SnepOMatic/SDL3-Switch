@@ -64,7 +64,7 @@
 #if defined(HAVE_SIGNAL_H) && !defined(SDL_PLATFORM_SWITCH)
 // List of signals to mask in the subthreads
 static const int sig_list[] = {
-    SIGHUP, SIGINT, SIGQUIT, SIGPIPE, SIGALRM, SIGTERM, SIGCHLD, SIGWINCH,
+    SIGHUP, SIGINT, SIGQUIT, SIGPIPE, SIGALRM, SIGTERM, SIGWINCH,
     SIGVTALRM, SIGPROF, 0
 };
 #endif

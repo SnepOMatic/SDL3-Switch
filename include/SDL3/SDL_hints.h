@@ -1343,6 +1343,23 @@ extern "C" {
 #define SDL_HINT_JOYSTICK_DEVICE "SDL_JOYSTICK_DEVICE"
 
 /**
+ * A variable containing a list of drum style controllers.
+ *
+ * The format of the string is a comma separated list of USB VID/PID pairs in
+ * hexadecimal form, e.g.
+ *
+ * `0xAAAA/0xBBBB,0xCCCC/0xDDDD`
+ *
+ * The variable can also take the form of "@file", in which case the named
+ * file will be loaded and interpreted as the value of the variable.
+ *
+ * This hint can be set anytime.
+ *
+ * \since This hint is available since SDL 3.4.4.
+ */
+#define SDL_HINT_JOYSTICK_DRUM_DEVICES "SDL_JOYSTICK_DRUM_DEVICES"
+
+/**
  * A variable controlling whether enhanced reports should be used for
  * controllers when using the HIDAPI driver.
  *
@@ -1460,6 +1477,23 @@ extern "C" {
  * \since This hint is available since SDL 3.2.0.
  */
 #define SDL_HINT_JOYSTICK_GAMECUBE_DEVICES_EXCLUDED "SDL_JOYSTICK_GAMECUBE_DEVICES_EXCLUDED"
+
+/**
+ * A variable containing a list of guitar style controllers.
+ *
+ * The format of the string is a comma separated list of USB VID/PID pairs in
+ * hexadecimal form, e.g.
+ *
+ * `0xAAAA/0xBBBB,0xCCCC/0xDDDD`
+ *
+ * The variable can also take the form of "@file", in which case the named
+ * file will be loaded and interpreted as the value of the variable.
+ *
+ * This hint can be set anytime.
+ *
+ * \since This hint is available since SDL 3.4.4.
+ */
+#define SDL_HINT_JOYSTICK_GUITAR_DEVICES "SDL_JOYSTICK_GUITAR_DEVICES"
 
 /**
  * A variable controlling whether the HIDAPI joystick drivers should be used.
@@ -4551,6 +4585,24 @@ extern "C" {
  * \since This hint is available since SDL 3.4.0.
  */
 #define SDL_HINT_WINDOWS_RAW_KEYBOARD_EXCLUDE_HOTKEYS "SDL_WINDOWS_RAW_KEYBOARD_EXCLUDE_HOTKEYS"
+
+/**
+ * A variable controlling whether the RIDEV_INPUTSINK flag is set when
+ * enabling Windows raw keyboard events.
+ *
+ * This enables the window to still receive input even if not in foreground.
+ *
+ * Focused windows that receive text input will still prevent input events
+ * from triggering.
+ *
+ * - "0": Input is not received when not in focus or foreground. (default)
+ * - "1": Input will be received even when not in focus or foreground.
+ *
+ * This hint can be set anytime.
+ *
+ * \since This hint is available since SDL 3.4.4.
+ */
+#define SDL_HINT_WINDOWS_RAW_KEYBOARD_INPUTSINK "SDL_WINDOWS_RAW_KEYBOARD_INPUTSINK"
 
 /**
  * A variable controlling whether SDL uses Kernel Semaphores on Windows.
