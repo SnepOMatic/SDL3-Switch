@@ -148,12 +148,8 @@
 /* Enable various process implementations */
 #define SDL_PROCESS_DUMMY 1
 
-#ifdef SDL_PLATFORM_TVOS
-#define SDL_SENSOR_DUMMY 1
-#else
 /* Enable the CoreMotion sensor driver */
 #define SDL_SENSOR_COREMOTION 1
-#endif
 
 /* Enable Unix style SO loading */
 #define SDL_LOADSO_DLOPEN 1
@@ -163,7 +159,7 @@
 #define SDL_THREAD_PTHREAD_RECURSIVE_MUTEX 1
 
 /* Enable various RTC system */
-#define SDL_TIME_UNIX 1
+#define SDL_TIME_SWITCH 1
 
 /* Enable various timer systems */
 #define SDL_TIMER_SWITCH 1

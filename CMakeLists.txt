@@ -1728,127 +1728,6 @@ if(ANDROID)
     target_link_options(SDL3-static INTERFACE "-Wl,-u,JNI_OnLoad")
   endif()
 
-elseif(EMSCRIPTEN)
-  # Hide noisy warnings that intend to aid mostly during initial stages of porting a new
-  # project. Uncomment at will for verbose cross-compiling -I/../ path info.
-  sdl_compile_options(PRIVATE "-Wno-warn-absolute-paths")
-
-  if(NOT SDL_EMSCRIPTEN_PERSISTENT_PATH STREQUAL "")
-    set(SDL_EMSCRIPTEN_PERSISTENT_PATH_STRING "${SDL_EMSCRIPTEN_PERSISTENT_PATH}")
-    sdl_link_dependency(idbfs LIBS idbfs.js)
-  endif()
-
-  sdl_glob_sources(
-    "${SDL3_SOURCE_DIR}/src/main/emscripten/*.c"
-    "${SDL3_SOURCE_DIR}/src/main/emscripten/*.h"
-  )
-  set(HAVE_SDL_MAIN_CALLBACKS TRUE)
-
-  sdl_glob_sources(
-    "${SDL3_SOURCE_DIR}/src/misc/emscripten/*.c"
-    "${SDL3_SOURCE_DIR}/src/misc/emscripten/*.h"
-  )
-  set(HAVE_SDL_MISC TRUE)
-
-  if(SDL_AUDIO)
-    set(SDL_AUDIO_DRIVER_EMSCRIPTEN 1)
-    sdl_glob_sources(
-      "${SDL3_SOURCE_DIR}/src/audio/emscripten/*.c"
-      "${SDL3_SOURCE_DIR}/src/audio/emscripten/*.h"
-    )
-    set(HAVE_SDL_AUDIO TRUE)
-  endif()
-
-  set(SDL_FILESYSTEM_EMSCRIPTEN 1)
-  sdl_glob_sources(
-    "${SDL3_SOURCE_DIR}/src/filesystem/emscripten/*.c"
-    "${SDL3_SOURCE_DIR}/src/filesystem/emscripten/*.h"
-  )
-  set(HAVE_SDL_FILESYSTEM TRUE)
-
-  set(SDL_FSOPS_POSIX 1)
-  sdl_sources("${SDL3_SOURCE_DIR}/src/filesystem/posix/SDL_sysfsops.c")
-  set(HAVE_SDL_FSOPS TRUE)
-
-  if(SDL_CAMERA)
-    set(SDL_CAMERA_DRIVER_EMSCRIPTEN 1)
-    set(HAVE_CAMERA TRUE)
-    sdl_glob_sources(
-      "${SDL3_SOURCE_DIR}/src/camera/emscripten/*.c"
-      "${SDL3_SOURCE_DIR}/src/camera/emscripten/*.h"
-    )
-  endif()
-
-  if(SDL_JOYSTICK)
-    set(SDL_JOYSTICK_EMSCRIPTEN 1)
-    sdl_glob_sources(
-      "${SDL3_SOURCE_DIR}/src/joystick/emscripten/*.c"
-      "${SDL3_SOURCE_DIR}/src/joystick/emscripten/*.h"
-    )
-    set(HAVE_SDL_JOYSTICK TRUE)
-  endif()
-
-  if(SDL_POWER)
-    set(SDL_POWER_EMSCRIPTEN 1)
-    sdl_glob_sources(
-      "${SDL3_SOURCE_DIR}/src/power/emscripten/*.c"
-      "${SDL3_SOURCE_DIR}/src/power/emscripten/*.h"
-    )
-    set(HAVE_SDL_POWER TRUE)
-  endif()
-
-  sdl_glob_sources(
-    "${SDL3_SOURCE_DIR}/src/locale/emscripten/*.c"
-    "${SDL3_SOURCE_DIR}/src/locale/emscripten/*.h"
-  )
-  set(HAVE_SDL_LOCALE TRUE)
-
-  set(SDL_TIME_UNIX 1)
-  sdl_glob_sources(
-    "${SDL3_SOURCE_DIR}/src/time/unix/*.c"
-    "${SDL3_SOURCE_DIR}/src/time/unix/*.h"
-  )
-  set(HAVE_SDL_TIME TRUE)
-
-  set(SDL_TIMER_UNIX 1)
-  sdl_glob_sources(
-    "${SDL3_SOURCE_DIR}/src/timer/unix/*.c"
-    "${SDL3_SOURCE_DIR}/src/timer/unix/*.h"
-  )
-  set(HAVE_SDL_TIMERS TRUE)
-
-  if(SDL_CLOCK_GETTIME)
-    set(HAVE_CLOCK_GETTIME 1)
-  endif()
-
-  if(SDL_SENSOR)
-    set(SDL_SENSOR_EMSCRIPTEN 1)
-    set(HAVE_SDL_SENSORS TRUE)
-    sdl_glob_sources(
-      "${SDL3_SOURCE_DIR}/src/sensor/emscripten/*.c"
-      "${SDL3_SOURCE_DIR}/src/sensor/emscripten/*.h"
-    )
-  endif()
-
-  if(SDL_VIDEO)
-    set(SDL_VIDEO_DRIVER_EMSCRIPTEN 1)
-    sdl_glob_sources(
-      "${SDL3_SOURCE_DIR}/src/video/emscripten/*.c"
-      "${SDL3_SOURCE_DIR}/src/video/emscripten/*.h"
-    )
-    set(HAVE_SDL_VIDEO TRUE)
-
-    #enable gles
-    if(SDL_OPENGLES)
-      set(HAVE_OPENGLES TRUE)
-      set(SDL_VIDEO_OPENGL_ES2 1)
-      set(SDL_VIDEO_RENDER_OGL_ES2 1)
-    endif()
-  endif()
-
-  CheckPTHREAD()
-  CheckLibUnwind()
-
 elseif(UNIX AND NOT (APPLE OR RISCOS OR HAIKU OR CYGWIN))
 
   set(SDL_DISABLE_DLOPEN_NOTES TRUE)
@@ -3499,6 +3378,10 @@ elseif(NINTENDO_SWITCH)
   if(SDL_CLOCK_GETTIME)
     set(HAVE_CLOCK_GETTIME 1)
   endif()
+
+  set(SDL_TIME_SWITCH 1)
+  sdl_glob_sources("${SDL3_SOURCE_DIR}/src/time/switch/*.c")
+  set(HAVE_SDL_TIME TRUE)
 
   set(SDL_TIMER_SWITCH 1)
   sdl_glob_sources("${SDL3_SOURCE_DIR}/src/timer/switch/*.c")
