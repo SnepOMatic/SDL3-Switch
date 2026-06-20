@@ -32,6 +32,10 @@ sudo cmake --install .
 
 Please note that building SDL requires at least Xcode 12.2 and the macOS 11.0 SDK.
 
+If you are getting errors building SDL_mfijoystick.m with Xcode 12.2, find your SDKs
+directory and move MacOSX10.15.sdk out of the way so it isn't accidentally being used
+by the build environment.
+
 To use the library once it's built, you essential have two possibilities:
 use the traditional autoconf/automake/make method, or use Xcode.
 
@@ -249,14 +253,14 @@ Functionality may be added in the future to help this.
 
 ## Raw Mouse Input
 
-On macOS 11.0 (Big Sur) and later, SDL uses the Game Controller framework's
-GCMouse API to provide raw, unaccelerated mouse input in relative mode. This
-is ideal for games and applications requiring precise 1:1 mouse movement.
+SDL uses the Game Controller framework's GCMouse API to provide raw,
+unaccelerated mouse input in relative mode. This is ideal for games
+and applications requiring precise 1:1 mouse movement.
 
-On older macOS versions, SDL falls back to NSEvent-based mouse input, which
-includes system mouse acceleration.
+On versions older than macOS 11.0 (Big Sur), SDL would fall back to
+NSEvent-based mouse input, which includes system mouse acceleration.
 
-To use accelerated (system-scaled) mouse movement on macOS 11.0+, set the hint:
+To use accelerated (system-scaled) mouse movement on macOS 14.0+, set the hint:
 
 ```c
 SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_SYSTEM_SCALE, "1");

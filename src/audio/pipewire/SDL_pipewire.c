@@ -706,7 +706,7 @@ static void registry_event_global_callback(void *object, uint32_t id, uint32_t p
             // Just want sink and source
             if (!SDL_strcasecmp(media_class, "Audio/Sink")) {
                 recording = false;
-            } else if (!SDL_strcasecmp(media_class, "Audio/Source")) {
+            } else if (!SDL_strcasecmp(media_class, "Audio/Source") || !SDL_strcasecmp(media_class, "Audio/Source/Virtual")) {
                 recording = true;
             } else {
                 return;
@@ -976,18 +976,18 @@ static void initialize_spa_info(const SDL_AudioSpec *spec, struct spa_audio_info
 
 static Uint8 *PIPEWIRE_GetDeviceBuf(SDL_AudioDevice *device, int *buffer_size)
 {
-    // See if a buffer is available. If this returns NULL, SDL_PlaybackAudioThreadIterate will return false, but since we own the thread, it won't kill playback.
-    // !!! FIXME: It's not clear to me if this ever returns NULL or if this was just defensive coding.
-
+    // See if a buffer is available. If this sets *buffer_size=0, then SDL_PlaybackAudioThreadIterate will skip this iteration but try again next time.
     struct pw_stream *stream = device->hidden->stream;
     struct pw_buffer *pw_buf = PIPEWIRE_pw_stream_dequeue_buffer(stream);
     if (pw_buf == NULL) {
+        *buffer_size = 0;
         return NULL;
     }
 
     struct spa_buffer *spa_buf = pw_buf->buffer;
     if (spa_buf->datas[0].data == NULL) {
         PIPEWIRE_pw_stream_queue_buffer(stream, pw_buf);
+        *buffer_size = 0;
         return NULL;
     }
 
@@ -1126,8 +1126,7 @@ static void SDLCALL PIPEWIRE_StreamNameChanged(void *userdata, const char *name,
     struct SDL_PrivateAudioData *priv = device->hidden;
 
     if (!priv || !priv->stream || !priv->loop) {
-        SDL_LogDebug(SDL_LOG_CATEGORY_AUDIO, "PIPEWIRE: StreamNameChanged: stream not ready, skipping");
-        return;
+        return;  // stream not ready yet, skip it.
     }
 
     struct spa_dict_item items[] = { { PW_KEY_MEDIA_NAME, newValue } };
@@ -1270,6 +1269,9 @@ static bool PIPEWIRE_OpenDevice(SDL_AudioDevice *device)
         PIPEWIRE_pw_thread_loop_unlock(hotplug_loop);
     }
 
+    // add this early so it will do its initial trigger when we aren't setup--skipping the attempt to update the name--since we're already explicitly setting it here.
+    SDL_AddHintCallback(SDL_HINT_AUDIO_DEVICE_STREAM_NAME, PIPEWIRE_StreamNameChanged, device);
+
     // Create the new stream
     priv->stream = PIPEWIRE_pw_stream_new_simple(PIPEWIRE_pw_thread_loop_get_loop(priv->loop), stream_name, props,
                                                  recording ? &stream_input_events : &stream_output_events, device);
@@ -1301,8 +1303,6 @@ static bool PIPEWIRE_OpenDevice(SDL_AudioDevice *device)
     if (PIPEWIRE_pw_stream_get_state(priv->stream, &error) == PW_STREAM_STATE_ERROR) {
         return SDL_SetError("Pipewire: Stream error: %s", error);
     }
-
-    SDL_AddHintCallback(SDL_HINT_AUDIO_DEVICE_STREAM_NAME, PIPEWIRE_StreamNameChanged, device);
 
     return true;
 }

@@ -6,12 +6,16 @@ from enum import Enum
 import json
 import logging
 import os
+import pathlib
 import re
+import shlex
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 class JobOs(Enum):
+    WindowsLatest = "windows-latest"
+    Windows2022 = "windows-2022"
     UbuntuLatest = "ubuntu-latest"
 
 class SdlPlatform(Enum):
@@ -20,6 +24,7 @@ class SdlPlatform(Enum):
 @dataclasses.dataclass(slots=True)
 class JobSpec:
     name: str
+    priority: bool
     os: JobOs
     platform: SdlPlatform
     artifact: Optional[str]
@@ -91,6 +96,7 @@ class JobDetails:
     pypi_packages: list[str] = dataclasses.field(default_factory=list)
     setup_gage_sdk_path: str = ""
     binutils_strings: str = "strings"
+    ctest_args: str = ""
 
     def to_workflow(self, enable_artifacts: bool) -> dict[str, str|bool]:
         data = {
@@ -142,6 +148,7 @@ class JobDetails:
             "setup-python": self.setup_python,
             "pypi-packages": my_shlex_join(self.pypi_packages),
             "binutils-strings": self.binutils_strings,
+            "ctest-args": self.ctest_args,
         }
         return {k: v for k, v in data.items() if v != ""}
 
@@ -157,7 +164,7 @@ def my_shlex_join(s):
     return " ".join(escape(s))
 
 
-def spec_to_job(spec: JobSpec, key: str, trackmem_symbol_names: bool) -> JobDetails:
+def spec_to_job(spec: JobSpec, key: str, trackmem_symbol_names: bool, ctest_args: list[str]) -> JobDetails:
     job = JobDetails(
         name=spec.name,
         key=key,
@@ -210,6 +217,7 @@ def spec_to_job(spec: JobSpec, key: str, trackmem_symbol_names: bool) -> JobDeta
             "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
             "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
         ))
+    job.ctest_args = shlex.join(ctest_args)
     if not build_parallel:
         job.cmake_build_arguments.append("-j1")
     if job.cflags or job.cppflags:
@@ -232,9 +240,14 @@ def spec_to_job(spec: JobSpec, key: str, trackmem_symbol_names: bool) -> JobDeta
     return job
 
 
-def spec_to_platform(spec: JobSpec, key: str, enable_artifacts: bool, trackmem_symbol_names: bool) -> dict[str, str|bool]:
+def spec_to_platform(spec: JobSpec, key: str, enable_artifacts: bool, trackmem_symbol_names: bool, ctest_args:list[str]) -> dict[str, str|bool]:
     logger.info("spec=%r", spec)
-    job = spec_to_job(spec, key=key, trackmem_symbol_names=trackmem_symbol_names)
+    job = spec_to_job(
+        spec,
+        key=key,
+        trackmem_symbol_names=trackmem_symbol_names,
+        ctest_args=ctest_args,
+    )
     logger.info("job=%r", job)
     platform = job.to_workflow(enable_artifacts=enable_artifacts)
     logger.info("platform=%r", platform)
@@ -249,6 +262,7 @@ def main():
     parser.add_argument("--commit-message-file")
     parser.add_argument("--no-artifact", dest="enable_artifacts", action="store_false")
     parser.add_argument("--trackmem-symbol-names", dest="trackmem_symbol_names", action="store_true")
+    parser.add_argument("--priority-only", dest="priority_only", action="store_true")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
@@ -263,6 +277,7 @@ def main():
     )
 
     filters = []
+    ctest_args = []
     if args.commit_message_file:
         with open(args.commit_message_file, "r") as f:
             commit_message = f.read()
@@ -275,14 +290,20 @@ def main():
             if re.search(r"\[sdl-ci-(full-)?trackmem(-symbol-names)?]", commit_message, flags=re.M):
                 args.trackmem_symbol_names = True
 
+            for m in re.finditer(r"\[sdl-ci-ctest-args? (.*)]", commit_message, flags=re.M):
+                ctest_args.extend(shlex.split(m.group(1)))
+
     if not filters:
-        filters.append("*")
+        if args.priority_only:
+            filters.extend(spec_id for spec_id, spec in JOB_SPECS.items() if spec.priority)
+        else:
+            filters.append("*")
 
     logger.info("filters: %r", filters)
 
     all_level_platforms = {}
 
-    all_platforms = {key: spec_to_platform(spec, key=key, enable_artifacts=args.enable_artifacts, trackmem_symbol_names=args.trackmem_symbol_names) for key, spec in JOB_SPECS.items()}
+    all_platforms = {key: spec_to_platform(spec, key=key, enable_artifacts=args.enable_artifacts, trackmem_symbol_names=args.trackmem_symbol_names, ctest_args=ctest_args) for key, spec in JOB_SPECS.items()}
 
     for level_i, level_keys in enumerate(all_level_keys, 1):
         level_key = f"level{level_i}"

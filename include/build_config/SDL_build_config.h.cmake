@@ -92,6 +92,9 @@
 #cmakedefine HAVE_WCSCMP 1
 #cmakedefine HAVE_WCSNCMP 1
 #cmakedefine HAVE_WCSTOL 1
+#cmakedefine HAVE_WCSTOLL 1
+#cmakedefine HAVE_WCSTOUL 1
+#cmakedefine HAVE_WCSTOULL 1
 #cmakedefine HAVE_STRLEN 1
 #cmakedefine HAVE_STRNLEN 1
 #cmakedefine HAVE_STRLCPY 1
@@ -107,7 +110,6 @@
 #cmakedefine HAVE_STRTOK_R 1
 #cmakedefine HAVE_ITOA 1
 #cmakedefine HAVE__LTOA 1
-#cmakedefine HAVE__UITOA 1
 #cmakedefine HAVE__ULTOA 1
 #cmakedefine HAVE_STRTOL 1
 #cmakedefine HAVE_STRTOUL 1
@@ -229,6 +231,7 @@
 #cmakedefine HAVE_XINPUT_H 1
 #cmakedefine HAVE_WINDOWS_GAMING_INPUT_H 1
 #cmakedefine HAVE_GAMEINPUT_H 1
+#cmakedefine SDL_GAMEINPUT_DYNAMIC 1
 #cmakedefine HAVE_DXGI_H 1
 #cmakedefine HAVE_DXGI1_5_H 1
 #cmakedefine HAVE_DXGI1_6_H 1
@@ -293,7 +296,7 @@
 #cmakedefine SDL_AUDIO_DRIVER_SWITCH 1
 #cmakedefine SDL_AUDIO_DRIVER_NGAGE 1
 #cmakedefine SDL_AUDIO_DRIVER_QNX 1
-
+#cmakedefine SDL_AUDIO_DRIVER_DOS_SOUNDBLASTER 1
 #cmakedefine SDL_AUDIO_DRIVER_PRIVATE 1
 
 /* Enable various input drivers */
@@ -304,6 +307,7 @@
 #cmakedefine SDL_HAVE_MACHINE_JOYSTICK_H 1
 #cmakedefine SDL_JOYSTICK_ANDROID 1
 #cmakedefine SDL_JOYSTICK_DINPUT 1
+#cmakedefine SDL_JOYSTICK_DOS 1
 #cmakedefine SDL_JOYSTICK_DUMMY 1
 #cmakedefine SDL_JOYSTICK_EMSCRIPTEN 1
 #cmakedefine SDL_JOYSTICK_GAMEINPUT 1
@@ -453,6 +457,7 @@
 #cmakedefine SDL_VIDEO_DRIVER_X11_XSYNC 1
 #cmakedefine SDL_VIDEO_DRIVER_X11_XTEST 1
 #cmakedefine SDL_VIDEO_DRIVER_QNX 1
+#cmakedefine SDL_VIDEO_DRIVER_DOSVESA 1
 
 #cmakedefine SDL_VIDEO_DRIVER_PRIVATE 1
 
@@ -463,6 +468,7 @@
 #cmakedefine SDL_VIDEO_RENDER_METAL 1
 #cmakedefine SDL_VIDEO_RENDER_VULKAN 1
 #cmakedefine SDL_VIDEO_RENDER_OGL 1
+#cmakedefine SDL_VIDEO_RENDER_OGL_ES 1
 #cmakedefine SDL_VIDEO_RENDER_OGL_ES2 1
 #cmakedefine SDL_VIDEO_RENDER_NGAGE 1
 #cmakedefine SDL_VIDEO_RENDER_PS2 1
@@ -627,6 +633,7 @@ typedef unsigned int uintptr_t;
 #cmakedefine SDL_DISABLE_LSX 1
 #cmakedefine SDL_DISABLE_LASX 1
 #cmakedefine SDL_DISABLE_NEON 1
+#cmakedefine SDL_DISABLE_SVE2 1
 
 #ifdef SDL_PLATFORM_PRIVATE
 #include "SDL_end_config_private.h"
