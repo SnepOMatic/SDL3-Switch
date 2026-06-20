@@ -20,6 +20,8 @@
 */
 #include "../../SDL_log_c.h"
 
+#include "SDL_internal.h"
+
 #if SDL_VIDEO_DRIVER_SWITCH
 
 #include "SDL_switchopengles.h"
