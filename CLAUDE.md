@@ -1,4 +1,4 @@
-AI must not be used to generate code for contributions to this project.
+AI must not be used to generate code for direct contributions to this project.
 
 "AI" in this case means a Large Language Model ("LLM"), such as ChatGPT,
 Claude, Copilot, Grok, etc.
@@ -9,6 +9,9 @@ if they include code from other projects.
 
 AI can be used to identify issues with contributions to this project, but the
 solutions to those issues should be authored by humans.
+
+AI may be used to give helpful pointers and example snippets that adhere to best
+practices to allow you to grasp how the code should work.
 
 We have found that AI will frequently hallucinate issues that are not actually
 problems in practice, report incorrect information, and describe problems that
