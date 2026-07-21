@@ -1499,6 +1499,9 @@ if(ANDROID)
     "${SDL3_SOURCE_DIR}/src/core/android/*.h"
   )
 
+  # Core Android code (asset I/O, logging, sensors) needs these regardless of the video subsystem.
+  sdl_link_dependency(android_core LIBS dl log android)
+
   sdl_glob_sources(
     "${SDL3_SOURCE_DIR}/src/misc/android/*.c"
     "${SDL3_SOURCE_DIR}/src/misc/android/*.h"
@@ -1629,10 +1632,6 @@ if(ANDROID)
     )
     set(HAVE_SDL_VIDEO TRUE)
 
-    # Core stuff
-    # find_library(ANDROID_DL_LIBRARY dl)
-    # FIXME failing dlopen https://github.com/android-ndk/ndk/issues/929
-    sdl_link_dependency(android_video LIBS dl log android)
     sdl_compile_definitions(PRIVATE "GL_GLEXT_PROTOTYPES")
 
     #enable gles
@@ -1663,6 +1662,9 @@ if(ANDROID)
         endif()
       endif()
     endif()
+  else()
+    # SDL_events.c pumps Android events even with video disabled; this TU supplies the stub implementations.
+    sdl_sources("${SDL3_SOURCE_DIR}/src/video/android/SDL_androidevents.c")
   endif()
 
   CheckPTHREAD()
@@ -2021,6 +2023,7 @@ elseif(UNIX AND NOT (APPLE OR RISCOS OR HAIKU OR CYGWIN))
       "${SDL3_SOURCE_DIR}/src/core/linux/SDL_evdev_capabilities.c"
       "${SDL3_SOURCE_DIR}/src/core/linux/SDL_evdev_capabilities.h"
       "${SDL3_SOURCE_DIR}/src/core/linux/SDL_threadprio.c"
+      "${SDL3_SOURCE_DIR}/src/core/linux/SDL_ubuntu_touch.c"
     )
 
     # src/core/unix/*.c is included in a generic if(UNIX) section, elsewhere.
@@ -2167,11 +2170,32 @@ elseif(WINDOWS OR CYGWIN)
       string(APPEND CMAKE_REQUIRED_FLAGS " /I\"$ENV{DXSDK_DIR}\\Include\"")
     endif()
 
-    check_include_file(d3d9.h HAVE_D3D9_H)
-    check_include_file(d3d11_1.h HAVE_D3D11_H)
-    check_include_file(ddraw.h HAVE_DDRAW_H)
-    check_include_file(dsound.h HAVE_DSOUND_H)
-    check_include_file(dinput.h HAVE_DINPUT_H)
+    # d3d9.h may need windows.h, but does not include it itself.
+    check_c_source_compiles("
+      #include <windows.h>
+      #include <d3d9.h>
+      int main(int argc, char **argv) { (void)argc; (void)argv; return 0; }" HAVE_D3D9_H
+    )
+    check_c_source_compiles("
+      #include <d3d11_1.h>
+      int main(int argc, char **argv) { (void)argc; (void)argv; return 0; }" HAVE_D3D11_H
+    )
+    # ddraw.h, dsound.h, and dinput.h may need windows.h, but does not include it itself.
+    check_c_source_compiles("
+      #include <windows.h>
+      #include <ddraw.h>
+      int main(int argc, char **argv) { (void)argc; (void)argv; return 0; }" HAVE_DDRAW_H
+    )
+    check_c_source_compiles("
+      #include <windows.h>
+      #include <dsound.h>
+      int main(int argc, char **argv) { (void)argc; (void)argv; return 0; }" HAVE_DSOUND_H
+    )
+    check_c_source_compiles("
+      #include <windows.h>
+      #include <dinput.h>
+      int main(int argc, char **argv) { (void)argc; (void)argv; return 0; }" HAVE_DINPUT_H
+    )
     if(SDL_CPU_ARM32)  # !!! FIXME: this should probably check if we're !(x86 or x86-64) instead of arm.
       set(HAVE_DINPUT_H 0)
     endif()
@@ -2236,6 +2260,7 @@ elseif(WINDOWS OR CYGWIN)
          return 0;
         }" HAVE_GAMEINPUT_LIB
       )
+      cmake_pop_check_state()
       if(HAVE_GAMEINPUT_LIB)
         sdl_link_dependency(gameinput LIBS gameinput.lib PKG_CONFIG_LINK_OPTIONS -lgameinput)
         set(SDL_GAMEINPUT_DYNAMIC 0)
@@ -3226,10 +3251,6 @@ elseif(PS2)
   )
   set(HAVE_SDL_THREADS TRUE)
 
-  set(SDL_TIME_PS2 1)
-  sdl_glob_sources("${SDL3_SOURCE_DIR}/src/time/ps2/*.c")
-  set(HAVE_SDL_TIME TRUE)
-
   set(SDL_TIMER_PS2 1)
   sdl_glob_sources("${SDL3_SOURCE_DIR}/src/timer/ps2/*.c")
   set(HAVE_SDL_TIMERS TRUE)
@@ -3788,6 +3809,12 @@ if(NOT HAVE_SDL_THREADS)
     message(FATAL_ERROR "Threads are needed by many SDL subsystems and may not be disabled")
   endif()
 endif()
+
+if(NOT HAVE_SDL_TIME)
+  set(SDL_TIME_DUMMY 1)
+  sdl_glob_sources("${SDL3_SOURCE_DIR}/src/time/dummy/*.c")
+endif()
+
 if(NOT HAVE_SDL_TIMERS)
   message(FATAL_ERROR "Timers are needed by many SDL subsystems and may not be disabled")
 endif()

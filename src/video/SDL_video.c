@@ -670,6 +670,12 @@ bool SDL_VideoInit(const char *driver_name)
 
     // Select the proper video driver
     video = NULL;
+#ifdef SDL_PLATFORM_LINUX
+    // https://github.com/libsdl-org/SDL/issues/12247
+    if (SDL_IsUbuntuTouch()) {
+        driver_name = "wayland";
+    }
+#endif
     if (!driver_name) {
         driver_name = SDL_GetHint(SDL_HINT_VIDEO_DRIVER);
     }
@@ -1525,9 +1531,6 @@ const SDL_DisplayMode *SDL_GetCurrentDisplayMode(SDL_DisplayID displayID)
     SDL_VideoDisplay *display = SDL_GetVideoDisplay(displayID);
 
     CHECK_DISPLAY_MAGIC(display, NULL);
-
-    // Make sure our mode list is updated
-    SDL_UpdateFullscreenDisplayModes(display);
 
     return display->current_mode;
 }
@@ -4423,10 +4426,12 @@ void SDL_OnWindowEnter(SDL_Window *window)
     if (_this->OnWindowEnter) {
         _this->OnWindowEnter(_this, window);
     }
+    SDL_UpdateRelativeMouseMode();
 }
 
 void SDL_OnWindowLeave(SDL_Window *window)
 {
+    SDL_UpdateRelativeMouseMode();
 }
 
 void SDL_OnWindowFocusGained(SDL_Window *window)
@@ -5841,21 +5846,21 @@ bool SDL_StartTextInputWithProperties(SDL_Window *window, SDL_PropertiesID props
         _this->SetTextInputProperties(_this, window, props);
     }
 
-    // Show the on-screen keyboard, if desired
-    if (AutoShowingScreenKeyboard() && !SDL_ScreenKeyboardShown(window)) {
-        if (_this->ShowScreenKeyboard) {
-            _this->ShowScreenKeyboard(_this, window, props);
-        }
-    }
-
     if (!window->text_input_active) {
-        // Finally start the text input system
+        // Start the text input system
         if (_this->StartTextInput) {
             if (!_this->StartTextInput(_this, window, props)) {
                 return false;
             }
         }
         window->text_input_active = true;
+    }
+
+    // Show the on-screen keyboard, if desired
+    if (AutoShowingScreenKeyboard() && !SDL_ScreenKeyboardShown(window)) {
+        if (_this->ShowScreenKeyboard) {
+            _this->ShowScreenKeyboard(_this, window, props);
+        }
     }
     return true;
 }
@@ -6323,6 +6328,17 @@ void SDL_Vulkan_UnloadLibrary(void)
 
 char const * const *SDL_Vulkan_GetInstanceExtensions(Uint32 *count)
 {
+    Uint32 tmpcount = 0;
+    if (!count) {
+        count = &tmpcount;
+    }
+
+    if (!_this->Vulkan_GetInstanceExtensions) {
+        *count = 0;
+        SDL_Unsupported();
+        return NULL;
+    }
+
     return _this->Vulkan_GetInstanceExtensions(_this, count);
 }
 

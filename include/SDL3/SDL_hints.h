@@ -4325,6 +4325,21 @@ extern "C" {
 #define SDL_HINT_VIDEO_X11_XRANDR "SDL_VIDEO_X11_XRANDR"
 
 /**
+ * A variable controlling whether the HDR headroom slider should be shown in
+ * the visionOS window settings.
+ *
+ * The variable can be set to the following values:
+ *
+ * - "0": The HDR headroom slider is not shown. (default)
+ * - "1": The HDR headroom slider is shown.
+ *
+ * This hint should be set before SDL is initialized.
+ *
+ * \since This hint is available since SDL 3.6.0.
+ */
+#define SDL_HINT_VISIONOS_HDR_HEADROOM_UI "SDL_VISIONOS_HDR_HEADROOM_UI"
+
+/**
  * A variable controlling whether touch should be enabled on the back panel of
  * the PlayStation Vita.
  *
@@ -4733,6 +4748,30 @@ extern "C" {
  * \since This hint is available since SDL 3.4.4.
  */
 #define SDL_HINT_WINDOWS_RAW_KEYBOARD_INPUTSINK "SDL_WINDOWS_RAW_KEYBOARD_INPUTSINK"
+
+/**
+ * A variable controlling whether the RIDEV_NOLEGACY flag is set when enabling
+ * Windows raw mouse events.
+ *
+ * If RIDEV_NOLEGACY is set, then Windows mouse events will not be sent for
+ * mouse motion while relative mode is enabled. This improves performance when
+ * players are using high DPI mice, but should be disabled while showing
+ * custom assert dialogs in your application code.
+ *
+ * Caution: Windows will not see mouse button releases in relative mode with
+ * this active. This means you should not enable relative mode while a mouse
+ * button is currently pressed.
+ *
+ * - "0": Windows mouse events will be generated while relative motion is
+ *   enabled. (default)
+ * - "1": Windows mouse events will not be generated while relative motion is
+ *   enabled.
+ *
+ * This hint can be set anytime.
+ *
+ * \since This hint is available since SDL 3.6.0.
+ */
+#define SDL_HINT_WINDOWS_RAW_MOUSE_NOLEGACY "SDL_WINDOWS_RAW_MOUSE_NOLEGACY"
 
 /**
  * A variable controlling whether SDL uses Kernel Semaphores on Windows.
